@@ -417,6 +417,25 @@ def occlude_grid(img: Image.Image, row: int, col: int, grid: int, fill: int = 12
     return out
 
 
+def occlude_box(
+    img: Image.Image, box_norm: tuple[float, float, float, float], fill: int = 128
+) -> Image.Image:
+    """
+    按归一化坐标 (x0, y0, x1, y1) 遮蔽任意矩形。
+
+    粗到细的精化需要在某个粗格子内部再划分网格，occlude_grid 只能按固定
+    网格划分整图，做不到这件事，所以需要这个更通用的版本。
+    """
+    out = img.convert("RGB").copy()
+    w, h = out.size
+    x0, y0, x1, y1 = box_norm
+    left, upper = int(x0 * w), int(y0 * h)
+    right = max(left + 1, int(x1 * w))
+    lower = max(upper + 1, int(y1 * h))
+    out.paste(Image.new("RGB", (right - left, lower - upper), (fill, fill, fill)), (left, upper))
+    return out
+
+
 # 与问题语义正交的图像变换。注意：若问题涉及颜色，亮度变换不满足正交性，
 # 必须按问题类型筛选可用变换——这是本方法已知的设计难点。
 PERTURBATIONS: dict[str, Callable[[Image.Image], Image.Image]] = {
@@ -658,6 +677,216 @@ async def cascade_detect(
 
 
 # --------------------------------------------------------------------------
+# 粗到细的遮蔽归因
+# --------------------------------------------------------------------------
+
+Box = tuple[float, float, float, float]
+
+
+def sliding_boxes(
+    img_w: int, img_h: int, window_frac: float = 0.5, stride_frac: float = 0.25
+) -> list[Box]:
+    """
+    生成覆盖全图的滑动遮蔽窗口，返回归一化坐标。
+
+    两个设计点都很关键，都是被实测逼出来的：
+
+    1. **为什么不用固定网格**：固定网格下，横跨格边界的目辏永远不会被任何
+       单个格子完整遮住。实测就栽在这上面——图中一个红圆横跨两格，任何单格
+       遮蔽都遮不全，答案始终不变，于是一个正确且明显有依据的回答被误判成
+       「无视觉依据型幻觉」。这是方法层面最致命的一类假阳性。
+
+    2. **为什么比例相对较短边、而不是直接用归一化比例**：4:3 的图上，
+       "0.4 × 0.4" 实际是 192×144 像素的矩形，高度方向依然可能盖不住目标。
+       这里让窗口在**像素空间始终是正方形**，边长取 window_frac × 较短边。
+
+    满足 stride < window 时窗口互相重叠，任何尺寸不超过窗口的目标都会被
+    某个窗口完整覆盖，从根上避免上面第 1 条。
+    """
+    short = min(img_w, img_h)
+    side = max(8, int(round(window_frac * short)))
+    stride = max(1, int(round(stride_frac * short)))
+    if stride > side:
+        raise ValueError("stride 必须不大于 window，否则窗口之间会出现覆盖空洞")
+
+    def positions(total: int) -> list[int]:
+        pos: list[int] = []
+        p = 0
+        while p + side < total:
+            pos.append(p)
+            p += stride
+        pos.append(max(0, total - side))
+        return sorted(set(pos))
+
+    xs, ys = positions(img_w), positions(img_h)
+    return [
+        (
+            x / img_w,
+            y / img_h,
+            min(1.0, (x + side) / img_w),
+            min(1.0, (y + side) / img_h),
+        )
+        for y in ys
+        for x in xs
+    ]
+
+
+@dataclass
+class RefinedAttribution:
+    """
+    两级遮蔽归因的结果。
+
+    第一级用带重叠的大窗口做探测，第二级对翻转窗口做**边缘收缩**，
+    把证据区域收到尽可能小。
+    """
+
+    baseline: bool | None
+    window: float
+    stride: float
+    tested_boxes: list[Box]
+    flip_boxes: list[Box]
+    refined_from: list[Box]
+    refined_boxes: list[Box]
+    shrink_step: float
+    calls: int
+
+    @property
+    def has_visual_grounding(self) -> bool:
+        """是否存在能改变答案的区域。False = 该陈述没有任何视觉依据。"""
+        return len(self.flip_boxes) > 0
+
+    def as_record(self) -> dict:
+        return {
+            "baseline": self.baseline,
+            "window": self.window,
+            "stride": self.stride,
+            "tested_boxes": [list(b) for b in self.tested_boxes],
+            "flip_boxes": [list(b) for b in self.flip_boxes],
+            "refined_from": [list(b) for b in self.refined_from],
+            "shrink_step": self.shrink_step,
+            "refined_boxes": [list(b) for b in self.refined_boxes],
+            "has_visual_grounding": self.has_visual_grounding,
+            "calls": self.calls,
+        }
+
+
+async def shrink_box(
+    client: VLMClient,
+    image: Image.Image,
+    question: str,
+    box: Box,
+    baseline: bool | None,
+    step: float,
+    max_steps: int = 5,
+    min_side: float = 0.06,
+) -> tuple[Box, int]:
+    """
+    从四条边依次向内收缩，只要答案仍然翻转就继续收。
+
+    为什么不是"把窗口再细分"：细分只会得到更小的子窗口，而实测表明
+    **只有把目标完整遮住答案才会翻转**——子窗口比目标小，永远遮不全，
+    于是什么都测不出来。收缩则相反：从一个"确实能翻转"的大窗口出发，
+    逐步逼近那个最小仍能翻转的区域，得到的才是真正的证据边界。
+
+    这是贪心，不是全局最优（收缩顺序会影响结果），所以跑两轮缓解。
+    返回 (收缩后的区域, 新增调用次数)。
+    """
+    x0, y0, x1, y1 = box
+    calls = 0
+    corners = ((0, 1, 2, 3), (2, 3, 0, 1))  # 两轮，顺序相反
+
+    for order in corners:
+        for edge in order:
+            for _ in range(max_steps):
+                if edge == 0:
+                    cand = (x0 + step, y0, x1, y1)
+                elif edge == 1:
+                    cand = (x0, y0 + step, x1, y1)
+                elif edge == 2:
+                    cand = (x0, y0, x1 - step, y1)
+                else:
+                    cand = (x0, y0, x1, y1 - step)
+
+                if cand[2] - cand[0] < min_side or cand[3] - cand[1] < min_side:
+                    break
+
+                ans = await client.ask_yesno(
+                    occlude_box(image, cand), question, temperature=0.0
+                )
+                calls += 1
+                if ans is not None and baseline is not None and ans != baseline:
+                    x0, y0, x1, y1 = cand
+                else:
+                    break  # 收过头了，这一边到此为止
+
+    return (x0, y0, x1, y1), calls
+
+
+async def probe_attribution_refined(
+    client: VLMClient,
+    image: Image.Image,
+    question: str,
+    window: float = 0.8,
+    stride: float = 0.25,
+    shrink_step: float = 0.06,
+    max_refine_boxes: int = 2,
+) -> RefinedAttribution:
+    """
+    两级遮蔽归因：滑动窗口探测 → 边缘收缩精化。
+
+    参数选择的依据（这条约束是本项目实测出来的，很重要）：
+
+        要让尺寸不超过 S 的目标一定能被某个窗口**完整**遮住，
+        必须满足  (window - stride) × 较短边 ≥ S
+
+    默认 window=0.8 / stride=0.25 时，(0.8-0.25)×short 即 0.55×较短边，
+    也就是能保证覆盖短边 55% 以内的目标。之前用 0.5/0.25（保证只有 0.25）
+    时，一个占短边 45% 的圆从未被完整遮住，导致正确回答被误判为
+    「无视觉依据」——这是最致命的一类假阳性。
+
+    调用次数 = 1（基线）+ 窗口数 + 收缩调用数。
+    """
+    baseline = await client.ask_yesno(image, question, temperature=0.0)
+    calls = 1
+
+    boxes = sliding_boxes(image.width, image.height, window, stride)
+    answers = await asyncio.gather(
+        *[
+            client.ask_yesno(occlude_box(image, b), question, temperature=0.0)
+            for b in boxes
+        ]
+    )
+    calls += len(boxes)
+
+    flip_boxes = [
+        b
+        for b, ans in zip(boxes, answers)
+        if ans is not None and baseline is not None and ans != baseline
+    ]
+    refined_from = flip_boxes[:max_refine_boxes]
+
+    refined_boxes: list[Box] = []
+    for box in refined_from:
+        tight, used = await shrink_box(
+            client, image, question, box, baseline, shrink_step
+        )
+        calls += used
+        refined_boxes.append(tight)
+
+    return RefinedAttribution(
+        baseline=baseline,
+        window=window,
+        stride=stride,
+        tested_boxes=boxes,
+        flip_boxes=flip_boxes,
+        refined_from=refined_from,
+        refined_boxes=refined_boxes,
+        shrink_step=shrink_step,
+        calls=calls,
+    )
+
+
+# --------------------------------------------------------------------------
 # 指标计算
 # --------------------------------------------------------------------------
 
@@ -763,7 +992,7 @@ async def run_pope_baseline(
 
 async def main() -> None:
     ap = argparse.ArgumentParser(description="HaluLens 评测骨架")
-    ap.add_argument("--task", default="pope_b0", choices=["pope_b0", "probe_demo"])
+    ap.add_argument("--task", default="pope_b0", choices=["pope_b0", "probe_demo", "attribution"])
     ap.add_argument("--model", default="gpt-4o-mini")
     ap.add_argument("--data", type=Path, help="POPE jsonl 路径")
     ap.add_argument("--image", type=Path, help="probe_demo 用的单张图片")
@@ -773,6 +1002,10 @@ async def main() -> None:
     ap.add_argument("--cache", type=Path, default=PROJECT_ROOT / ".cache" / "vlm")
     ap.add_argument("--concurrency", type=int, default=4)
     ap.add_argument("--grid", type=int, default=3)
+    ap.add_argument("--window", type=float, default=0.8,
+                    help="遮蔽窗口边长（相对较短边）。须与 stride 满足 window-stride >= 目标尺寸")
+    ap.add_argument("--stride", type=float, default=0.25, help="窗口步长（同口径），必须 <= window")
+    ap.add_argument("--shrink-step", type=float, default=0.06, help="边缘收缩步长（同口径）")
     args = ap.parse_args()
 
     # max_tokens 默认 1024：DeepSeek V4 属于推理模型，会先输出思维链。
@@ -802,6 +1035,81 @@ async def main() -> None:
             print("\n=== B0 基线（POPE）===")
             for k, v in metrics.items():
                 print(f"  {k:20s} {v}")
+        elif args.task == "attribution":
+            if not args.image:
+                raise SystemExit("--image 必填")
+            from viz import make_attribution_figure
+
+            img = Image.open(args.image).convert("RGB")
+            res = await probe_attribution_refined(
+                client,
+                img,
+                args.question,
+                window=args.window,
+                stride=args.stride,
+                shrink_step=args.shrink_step,
+            )
+
+            # 再取一次原始回答用于展示。同图同问同参数，必然命中缓存，不产生费用。
+            raw_resp = await client.ask(img, args.question + YESNO_SUFFIX, temperature=0.0)
+            baseline_text = raw_resp["text"] or "（空）"
+
+            # 判定必须区分肯定式与否定式回答。
+            # 对"图中没有 X"这类否定回答，X 本身不对应任何图像区域，所以
+            # "没有区域能改变答案"是正常现象，绝不能据此判为幻觉——那是
+            # 方法最容易产生的第二类假阳性。
+            if res.baseline is None:
+                verdict = "基线回答未能解析，本次归因不成立，应先排查解析问题"
+            elif res.baseline is False:
+                if res.has_visual_grounding:
+                    verdict = (
+                        "否定式回答，但存在能改变它的区域——说明该否定判断依赖局部图像内容，"
+                        "可核验该区域是否真的不含该目标"
+                    )
+                else:
+                    verdict = (
+                        "否定式回答，且无任何区域能改变它。「不存在」本身不对应任何图像区域，"
+                        "因此无可高亮属正常，不据此判为幻觉"
+                    )
+            elif res.has_visual_grounding:
+                verdict = "有视觉依据：答案依赖高亮区域，可据此核验该区域是否真的支持该陈述"
+            else:
+                verdict = (
+                    "⚠ 高疑似幻觉：模型给出了肯定式回答，却没有任何区域能影响它——"
+                    "该回答很可能并非来自图像内容"
+                )
+
+            out_img = make_attribution_figure(
+                img,
+                question=args.question,
+                baseline_text=baseline_text,
+                verdict=verdict,
+                tested_boxes=res.tested_boxes,
+                flip_boxes=res.flip_boxes,
+                refined_boxes_norm=res.refined_boxes,
+                calls=res.calls,
+                out_path=PROJECT_ROOT / "reports" / f"attribution-{meta.run_id}.png",
+            )
+
+            print("\n=== 遮蔽敏感性归因 ===")
+            print(f"  模型原始回答   : {baseline_text}")
+            print(f"  被测窗口       : {len(res.tested_boxes)} 个 "
+                  f"(窗口 {res.window} / 步长 {res.stride})，"
+                  f"其中使答案翻转 {len(res.flip_boxes)} 个")
+            print(f"  精化           : 对前 {len(res.refined_from)} 个翻转窗口做边缘收缩"
+                  f"（步长 {res.shrink_step}），得证据区域 {len(res.refined_boxes)} 块")
+            print(f"  是否有视觉依据 : {res.has_visual_grounding}")
+            print(f"  模型调用次数   : {res.calls}")
+            print(f"  报告图         : {out_img}")
+            logger.log(
+                {
+                    "task": "attribution",
+                    "image": str(args.image),
+                    "question": args.question,
+                    "baseline_text": baseline_text,
+                    **res.as_record(),
+                }
+            )
         else:
             if not args.image:
                 raise SystemExit("--image 必填")

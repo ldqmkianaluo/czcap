@@ -131,7 +131,45 @@ check("强制格式后缀已定义", isinstance(H.YESNO_SUFFIX, str) and len(H.Y
 
 print()
 print("=" * 60)
-print("6. openai SDK 接口形状检查")
+print("6. 滑动遮蔽窗口 sliding_boxes")
+print("=" * 60)
+
+IW, IH = 480, 360  # 故意用非正方形图，这正是踩过坑的地方
+boxes = H.sliding_boxes(IW, IH, window_frac=0.5, stride_frac=0.25)
+
+check("窗口数量", len(boxes), 15)
+check("全部落在图内", all(0 <= b[0] and 0 <= b[1] and b[2] <= 1.0001 and b[3] <= 1.0001 for b in boxes), True)
+
+# 像素空间的边长必须一致：若直接用归一化比例，4:3 图上会得到 192×144 的矩形，
+# 高度方向盖不住目标，就退化成"固定网格遮不全"的老问题
+px_w = {round((b[2] - b[0]) * IW) for b in boxes}
+px_h = {round((b[3] - b[1]) * IH) for b in boxes}
+check("像素宽度唯一", len(px_w), 1)
+check("像素高度唯一", len(px_h), 1)
+check("像素空间是正方形", px_w == px_h, True)
+check("窗口像素边长 = 0.5 × 较短边", list(px_w)[0], 180)
+
+# 覆盖无空洞：逐点采样确认没有像素落在所有窗口之外
+covered = set()
+for b in boxes:
+    x0, y0 = int(b[0] * IW), int(b[1] * IH)
+    x1, y1 = int(round(b[2] * IW)), int(round(b[3] * IH))
+    for x in range(x0, x1, 3):
+        for y in range(y0, y1, 3):
+            covered.add((x, y))
+missing = [(x, y) for x in range(0, IW, 3) for y in range(0, IH, 3) if (x, y) not in covered]
+check("覆盖无空洞（3px 采样）", len(missing), 0)
+
+# stride > window 必须报错，否则会静默产生覆盖空洞
+try:
+    H.sliding_boxes(IW, IH, window_frac=0.2, stride_frac=0.5)
+    check("stride > window 应当报错", False, True)
+except ValueError:
+    check("stride > window 正确报错", True, True)
+
+print()
+print("=" * 60)
+print("7. openai SDK 接口形状检查")
 print("=" * 60)
 
 try:
