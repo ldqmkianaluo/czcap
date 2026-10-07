@@ -43,6 +43,14 @@ PROMPT_VERSION = "v0.1.0"
 # 以当前工作目录为基准——否则从不同目录运行会把结果散落到各处。
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
+# 被 max_tokens 截断时的扩容上限。
+#
+# 推理模型偶尔会把整个 token 预算烧在思维链上，一个字答案都不输出。
+# 实测：27 次问答里出现 2 次，特征是 finish_reason=length 且内容为空字符串。
+# 遇到这种情况就放大预算重试一次，而不是直接加大默认值——默认值加大会让
+# 每一次调用都变贵，而这类失控只是少数。
+TRUNCATION_MAX_TOKENS = 4096
+
 
 # --------------------------------------------------------------------------
 # 运行记录：每次实验必须留下可复现的元信息
@@ -220,7 +228,9 @@ class VLMClient:
 
     # ---------------- 缓存 ----------------
 
-    def _cache_key(self, image_bytes: bytes, question: str, temperature: float) -> str:
+    def _cache_key(
+        self, image_bytes: bytes, question: str, temperature: float, max_tokens: int
+    ) -> str:
         h = hashlib.sha256()
         for part in (
             self.model,
@@ -228,7 +238,7 @@ class VLMClient:
             hashlib.sha256(image_bytes).hexdigest(),
             question,
             f"T={temperature}",
-            f"max_tokens={self.max_tokens}",
+            f"max_tokens={max_tokens}",
         ):
             h.update(part.encode("utf-8"))
         return h.hexdigest()
@@ -254,16 +264,45 @@ class VLMClient:
         image: Image.Image,
         question: str,
         temperature: float | None = None,
+        max_tokens: int | None = None,
+        _allow_grow: bool = True,
     ) -> dict:
-        """返回 {'text', 'input_tokens', 'output_tokens', 'cached'}"""
+        """返回 {'text', 'input_tokens', 'output_tokens', 'cached', 'finish_reason'}"""
         temperature = self.temperature if temperature is None else temperature
+        max_tokens = self.max_tokens if max_tokens is None else max_tokens
         image_bytes = image_to_bytes(image)
-        key = self._cache_key(image_bytes, question, temperature)
+        key = self._cache_key(image_bytes, question, temperature, max_tokens)
+
+        async def _finalize(payload: dict, cached: bool) -> dict:
+            """
+            收尾：发现被截断就扩容重试一次。
+
+            缓存命中也要走这条路径，否则重跑时会直接复用那份被截断的结果，
+            重试机制就等于失效了。
+            """
+            if (
+                payload.get("finish_reason") == "length"
+                and _allow_grow
+                and max_tokens < TRUNCATION_MAX_TOKENS
+            ):
+                grown = min(max_tokens * 4, TRUNCATION_MAX_TOKENS)
+                self.logger.log(
+                    {
+                        "task": "vlm_truncation_grow",
+                        "question": question,
+                        "from_max_tokens": max_tokens,
+                        "to_max_tokens": grown,
+                    }
+                )
+                return await self.ask(
+                    image, question, temperature, max_tokens=grown, _allow_grow=False
+                )
+            return {**payload, "cached": cached}
 
         hit = self._cache_read(key)
         if hit is not None:
             self.logger.cached_calls += 1
-            return {**hit, "cached": True}
+            return await _finalize(hit, True)
 
         b64 = base64.b64encode(image_bytes).decode("ascii")
         messages = [
@@ -284,11 +323,16 @@ class VLMClient:
                         model=self.model,
                         messages=messages,
                         temperature=temperature,
-                        max_tokens=self.max_tokens,
+                        max_tokens=max_tokens,
                     )
                 usage = getattr(resp, "usage", None)
+                choice = resp.choices[0]
                 payload = {
-                    "text": (resp.choices[0].message.content or "").strip(),
+                    "text": (choice.message.content or "").strip(),
+                    # finish_reason 必须记录：空回复到底是"模型什么都没说"还是
+                    # "被 max_tokens 截断了"，只有这个字段能区分。
+                    # 'length' = 被截断，'stop' = 正常结束。
+                    "finish_reason": getattr(choice, "finish_reason", None),
                     "input_tokens": getattr(usage, "prompt_tokens", 0) if usage else 0,
                     "output_tokens": getattr(usage, "completion_tokens", 0) if usage else 0,
                     "model_reported": getattr(resp, "model", self.model),
@@ -298,7 +342,7 @@ class VLMClient:
                 self.logger.output_tokens += payload["output_tokens"]
                 self.logger.meta.model_reported_version = payload["model_reported"]
                 self._cache_write(key, payload)
-                return {**payload, "cached": False}
+                return await _finalize(payload, False)
             except Exception as exc:  # noqa: BLE001
                 # 4xx 多为配置问题（密钥错、模型名错、参数不合法），重试没有意义，
                 # 应立即报错，否则白白等上几轮退避。429 是限流，仍然重试。
@@ -343,6 +387,7 @@ class VLMClient:
                 "question": question,
                 "asked": asked,
                 "verdict": verdict,
+                "finish_reason": resp.get("finish_reason"),
                 "raw": text,
             }
         )
@@ -649,18 +694,28 @@ def classification_metrics(y_true: Sequence[int], y_pred: Sequence[int]) -> dict
 
 def load_pope(jsonl_path: Path) -> list[dict]:
     """
-    读取 POPE 数据。TODO: 按官方仓库真实字段调整。
+    读取评测数据。TODO: 按官方仓库真实字段调整。
 
     期望每行：
         {"image": "path/to.jpg", "question": "Is there a cat?", "label": 1}
     其中 label: 1 = 该物体存在（回答 yes 为正确），0 = 不存在（回答 no 为正确）。
+
+    图片路径若是相对路径，按 jsonl 文件所在目录解析，而不是按当前工作目录——
+    这样从任何目录运行结果都一致，不会因为 cwd 不同而找不到图片。
     """
+    jsonl_path = Path(jsonl_path)
+    base_dir = jsonl_path.parent
     rows = []
     with jsonl_path.open(encoding="utf-8") as fh:
         for line in fh:
             line = line.strip()
-            if line:
-                rows.append(json.loads(line))
+            if not line:
+                continue
+            rec = json.loads(line)
+            img = Path(rec["image"])
+            if not img.is_absolute():
+                rec["image"] = str((base_dir / img).resolve())
+            rows.append(rec)
     return rows
 
 
@@ -720,9 +775,9 @@ async def main() -> None:
     ap.add_argument("--grid", type=int, default=3)
     args = ap.parse_args()
 
-    # max_tokens 默认 512：DeepSeek V4 属于推理模型，会先输出思维链，
-    # 设得太小会导致答案还没说出来就被截断成空字符串。
-    gen_params = {"temperature": 0.0, "max_tokens": 512}
+    # max_tokens 默认 1024：DeepSeek V4 属于推理模型，会先输出思维链。
+    # 实测 512 仍会出现被截断导致的空回复（12 次里 1 次），所以留足余量。
+    gen_params = {"temperature": 0.0, "max_tokens": 1024}
     probe_params = {
         "paraphrase_threshold": 0.85,
         "perturbation_threshold": 0.75,

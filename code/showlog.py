@@ -83,12 +83,24 @@ if not shown:
 for i, r in enumerate(shown, 1):
     tag = "解析失败" if r.get("verdict") is None else ("是" if r["verdict"] else "否")
     cache = "[缓存]" if r.get("cached") else "[实时]"
+    fr = r.get("finish_reason") or "?"
+    # finish_reason 是判断空回复原因的关键：length = 被截断，stop = 模型主动结束
+    hint = {"length": " ← 被 max_tokens 截断", "stop": " ← 正常结束"}.get(fr, "")
     raw = (r.get("raw") or "").replace("\n", " ⏎ ")
     if len(raw) > args.raw_width:
         raw = raw[: args.raw_width] + " …"
-    print(f"\n{i:2d}. {cache} 判定={tag}")
+    print(f"\n{i:2d}. {cache} 判定={tag}  finish_reason={fr}{hint}")
     print(f"    问题: {r.get('question')}")
-    print(f"    原话: {raw}")
+    print(f"    原话: {raw if raw.strip() else '（空字符串）'}")
+
+# finish_reason 分布：这条统计能直接指出空回复的成因
+print()
+print("finish_reason 分布：")
+fr_counts: dict[str, int] = {}
+for r in calls:
+    fr_counts[r.get("finish_reason") or "未记录"] = fr_counts.get(r.get("finish_reason") or "未记录", 0) + 1
+for k, v in sorted(fr_counts.items(), key=lambda kv: -kv[1]):
+    print(f"  {str(k):10s} {v}")
 
 print()
 if failed:
