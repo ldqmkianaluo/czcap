@@ -1,0 +1,24 @@
+# 统一换行符。
+# 不加这个文件，Windows 上提交、Linux/macOS 上克隆会出现"整个文件都改了"的
+# 假 diff，评审看提交历史时会很困惑。
+* text=auto
+
+*.py    text eol=lf
+*.md    text eol=lf
+*.txt   text eol=lf
+*.json  text eol=lf
+*.jsonl text eol=lf
+*.yml   text eol=lf
+*.yaml  text eol=lf
+*.ps1   text eol=lf
+*.sh    text eol=lf
+
+# 二进制文件不做换行符转换
+*.jpg   binary
+*.jpeg  binary
+*.png   binary
+*.gif   binary
+*.mp4   binary
+*.pdf   binary
+*.zip   binary
+*.docx  binary
