@@ -1,138 +1,130 @@
 {"image": "images/calib/001.png", "question": "Is there a purple square in the image?", "label": 1, "neg_type": null}
-{"image": "images/calib/001.png", "question": "Is there a blue ellipse in the image?", "label": 1, "neg_type": null}
-{"image": "images/calib/001.png", "question": "Is there a red rect in the image?", "label": 0, "neg_type": "easy_negative"}
-{"image": "images/calib/001.png", "question": "Is there a blue rect in the image?", "label": 0, "neg_type": "same_color_other_shape"}
-{"image": "images/calib/001.png", "question": "Is there a red circle in the image?", "label": 0, "neg_type": "same_shape_other_color"}
+{"image": "images/calib/001.png", "question": "Is there a red ellipse in the image?", "label": 1, "neg_type": null}
+{"image": "images/calib/001.png", "question": "Is there a orange triangle in the image?", "label": 0, "neg_type": "easy_negative"}
+{"image": "images/calib/001.png", "question": "Is there a red triangle in the image?", "label": 0, "neg_type": "same_color_other_shape"}
+{"image": "images/calib/001.png", "question": "Is there a orange circle in the image?", "label": 0, "neg_type": "same_shape_other_color"}
 {"image": "images/calib/001.png", "question": "Is the purple square on the right side of the image?", "label": 0, "neg_type": "wrong_position"}
 {"image": "images/calib/001.png", "question": "Are there two purple squares in the image?", "label": 0, "neg_type": "wrong_count"}
-{"image": "images/calib/002.png", "question": "Is there a blue rect in the image?", "label": 1, "neg_type": null}
-{"image": "images/calib/002.png", "question": "Is there a red ellipse in the image?", "label": 1, "neg_type": null}
-{"image": "images/calib/002.png", "question": "Is there a green triangle in the image?", "label": 0, "neg_type": "easy_negative"}
-{"image": "images/calib/002.png", "question": "Is there a red triangle in the image?", "label": 0, "neg_type": "same_color_other_shape"}
+{"image": "images/calib/002.png", "question": "Is there a red circle in the image?", "label": 1, "neg_type": null}
+{"image": "images/calib/002.png", "question": "Is there a black ellipse in the image?", "label": 1, "neg_type": null}
+{"image": "images/calib/002.png", "question": "Is there a green rect in the image?", "label": 0, "neg_type": "easy_negative"}
+{"image": "images/calib/002.png", "question": "Is there a red rect in the image?", "label": 0, "neg_type": "same_color_other_shape"}
 {"image": "images/calib/002.png", "question": "Is there a green circle in the image?", "label": 0, "neg_type": "same_shape_other_color"}
-{"image": "images/calib/002.png", "question": "Is the red ellipse on the right side of the image?", "label": 0, "neg_type": "wrong_position"}
-{"image": "images/calib/002.png", "question": "Are there two red ellipses in the image?", "label": 0, "neg_type": "wrong_count"}
-{"image": "images/calib/003.png", "question": "Is there a brown rect in the image?", "label": 1, "neg_type": null}
-{"image": "images/calib/003.png", "question": "Is there a orange rect in the image?", "label": 1, "neg_type": null}
-{"image": "images/calib/003.png", "question": "Is there a yellow square in the image?", "label": 0, "neg_type": "easy_negative"}
-{"image": "images/calib/003.png", "question": "Is there a red square in the image?", "label": 0, "neg_type": "same_color_other_shape"}
-{"image": "images/calib/003.png", "question": "Is there a yellow circle in the image?", "label": 0, "neg_type": "same_shape_other_color"}
-{"image": "images/calib/003.png", "question": "Is the orange rect on the right side of the image?", "label": 0, "neg_type": "wrong_position"}
-{"image": "images/calib/003.png", "question": "Are there two orange rects in the image?", "label": 0, "neg_type": "wrong_count"}
-{"image": "images/calib/004.png", "question": "Is there a purple ellipse in the image?", "label": 1, "neg_type": null}
-{"image": "images/calib/004.png", "question": "Is there a cyan ellipse in the image?", "label": 1, "neg_type": null}
-{"image": "images/calib/004.png", "question": "Is there a green triangle in the image?", "label": 0, "neg_type": "easy_negative"}
-{"image": "images/calib/004.png", "question": "Is there a red triangle in the image?", "label": 0, "neg_type": "same_color_other_shape"}
-{"image": "images/calib/004.png", "question": "Is there a green circle in the image?", "label": 0, "neg_type": "same_shape_other_color"}
-{"image": "images/calib/004.png", "question": "Is the orange ellipse on the right side of the image?", "label": 0, "neg_type": "wrong_position"}
-{"image": "images/calib/004.png", "question": "Are there two orange ellipses in the image?", "label": 0, "neg_type": "wrong_count"}
-{"image": "images/calib/005.png", "question": "Is there a brown rect in the image?", "label": 1, "neg_type": null}
-{"image": "images/calib/005.png", "question": "Is there a cyan ellipse in the image?", "label": 1, "neg_type": null}
-{"image": "images/calib/005.png", "question": "Is there a blue square in the image?", "label": 0, "neg_type": "easy_negative"}
-{"image": "images/calib/005.png", "question": "Is there a red square in the image?", "label": 0, "neg_type": "same_color_other_shape"}
+{"image": "images/calib/002.png", "question": "Is the cyan circle on the right side of the image?", "label": 0, "neg_type": "wrong_position"}
+{"image": "images/calib/002.png", "question": "Are there two cyan circles in the image?", "label": 0, "neg_type": "wrong_count"}
+{"image": "images/calib/003.png", "question": "Is there a black rect in the image?", "label": 1, "neg_type": null}
+{"image": "images/calib/003.png", "question": "Is there a red ellipse in the image?", "label": 1, "neg_type": null}
+{"image": "images/calib/003.png", "question": "Is there a green circle in the image?", "label": 0, "neg_type": "same_shape_other_color"}
+{"image": "images/calib/003.png", "question": "Is the red ellipse on the right side of the image?", "label": 0, "neg_type": "wrong_position"}
+{"image": "images/calib/003.png", "question": "Are there two red ellipses in the image?", "label": 0, "neg_type": "wrong_count"}
+{"image": "images/calib/004.png", "question": "Is there a green square in the image?", "label": 1, "neg_type": null}
+{"image": "images/calib/004.png", "question": "Is there a brown triangle in the image?", "label": 1, "neg_type": null}
+{"image": "images/calib/004.png", "question": "Is there a yellow ellipse in the image?", "label": 0, "neg_type": "easy_negative"}
+{"image": "images/calib/004.png", "question": "Is there a red ellipse in the image?", "label": 0, "neg_type": "same_color_other_shape"}
+{"image": "images/calib/004.png", "question": "Is there a yellow circle in the image?", "label": 0, "neg_type": "same_shape_other_color"}
+{"image": "images/calib/004.png", "question": "Is the blue square on the right side of the image?", "label": 0, "neg_type": "wrong_position"}
+{"image": "images/calib/004.png", "question": "Are there two blue squares in the image?", "label": 0, "neg_type": "wrong_count"}
+{"image": "images/calib/005.png", "question": "Is there a green rect in the image?", "label": 1, "neg_type": null}
+{"image": "images/calib/005.png", "question": "Is there a orange square in the image?", "label": 1, "neg_type": null}
 {"image": "images/calib/005.png", "question": "Is there a blue circle in the image?", "label": 0, "neg_type": "same_shape_other_color"}
-{"image": "images/calib/005.png", "question": "Is the green rect on the right side of the image?", "label": 0, "neg_type": "wrong_position"}
-{"image": "images/calib/005.png", "question": "Are there two green rects in the image?", "label": 0, "neg_type": "wrong_count"}
-{"image": "images/calib/006.png", "question": "Is there a brown ellipse in the image?", "label": 1, "neg_type": null}
-{"image": "images/calib/006.png", "question": "Is there a green triangle in the image?", "label": 1, "neg_type": null}
+{"image": "images/calib/005.png", "question": "Is the red ellipse on the right side of the image?", "label": 0, "neg_type": "wrong_position"}
+{"image": "images/calib/005.png", "question": "Are there two red ellipses in the image?", "label": 0, "neg_type": "wrong_count"}
+{"image": "images/calib/006.png", "question": "Is there a green square in the image?", "label": 1, "neg_type": null}
+{"image": "images/calib/006.png", "question": "Is there a red rect in the image?", "label": 1, "neg_type": null}
 {"image": "images/calib/006.png", "question": "Is there a blue circle in the image?", "label": 0, "neg_type": "easy_negative"}
 {"image": "images/calib/006.png", "question": "Is there a red circle in the image?", "label": 0, "neg_type": "same_color_other_shape"}
 {"image": "images/calib/006.png", "question": "Is there a blue square in the image?", "label": 0, "neg_type": "same_shape_other_color"}
-{"image": "images/calib/006.png", "question": "Is the orange rect on the right side of the image?", "label": 0, "neg_type": "wrong_position"}
-{"image": "images/calib/006.png", "question": "Are there two orange rects in the image?", "label": 0, "neg_type": "wrong_count"}
-{"image": "images/calib/007.png", "question": "Is there a orange rect in the image?", "label": 1, "neg_type": null}
-{"image": "images/calib/007.png", "question": "Is there a blue square in the image?", "label": 1, "neg_type": null}
-{"image": "images/calib/007.png", "question": "Is there a purple circle in the image?", "label": 0, "neg_type": "easy_negative"}
+{"image": "images/calib/006.png", "question": "Is the green square on the right side of the image?", "label": 0, "neg_type": "wrong_position"}
+{"image": "images/calib/006.png", "question": "Are there two green squares in the image?", "label": 0, "neg_type": "wrong_count"}
+{"image": "images/calib/007.png", "question": "Is there a yellow rect in the image?", "label": 1, "neg_type": null}
+{"image": "images/calib/007.png", "question": "Is there a green rect in the image?", "label": 1, "neg_type": null}
+{"image": "images/calib/007.png", "question": "Is there a orange circle in the image?", "label": 0, "neg_type": "easy_negative"}
 {"image": "images/calib/007.png", "question": "Is there a red circle in the image?", "label": 0, "neg_type": "same_color_other_shape"}
-{"image": "images/calib/007.png", "question": "Is there a purple square in the image?", "label": 0, "neg_type": "same_shape_other_color"}
-{"image": "images/calib/007.png", "question": "Is the yellow ellipse on the right side of the image?", "label": 0, "neg_type": "wrong_position"}
-{"image": "images/calib/007.png", "question": "Are there two yellow ellipses in the image?", "label": 0, "neg_type": "wrong_count"}
-{"image": "images/calib/008.png", "question": "Is there a orange circle in the image?", "label": 1, "neg_type": null}
-{"image": "images/calib/008.png", "question": "Is there a black square in the image?", "label": 1, "neg_type": null}
-{"image": "images/calib/008.png", "question": "Is there a red triangle in the image?", "label": 0, "neg_type": "easy_negative"}
-{"image": "images/calib/008.png", "question": "Is there a blue triangle in the image?", "label": 0, "neg_type": "same_color_other_shape"}
-{"image": "images/calib/008.png", "question": "Is there a red circle in the image?", "label": 0, "neg_type": "same_shape_other_color"}
-{"image": "images/calib/008.png", "question": "Is the blue circle on the right side of the image?", "label": 0, "neg_type": "wrong_position"}
-{"image": "images/calib/008.png", "question": "Are there two blue circles in the image?", "label": 0, "neg_type": "wrong_count"}
-{"image": "images/calib/009.png", "question": "Is there a orange rect in the image?", "label": 1, "neg_type": null}
-{"image": "images/calib/009.png", "question": "Is there a cyan ellipse in the image?", "label": 1, "neg_type": null}
+{"image": "images/calib/007.png", "question": "Is there a orange triangle in the image?", "label": 0, "neg_type": "same_shape_other_color"}
+{"image": "images/calib/007.png", "question": "Is the green rect on the right side of the image?", "label": 0, "neg_type": "wrong_position"}
+{"image": "images/calib/007.png", "question": "Are there two green rects in the image?", "label": 0, "neg_type": "wrong_count"}
+{"image": "images/calib/008.png", "question": "Is there a black ellipse in the image?", "label": 1, "neg_type": null}
+{"image": "images/calib/008.png", "question": "Is there a black rect in the image?", "label": 1, "neg_type": null}
+{"image": "images/calib/008.png", "question": "Is there a blue circle in the image?", "label": 0, "neg_type": "easy_negative"}
+{"image": "images/calib/008.png", "question": "Is there a red circle in the image?", "label": 0, "neg_type": "same_color_other_shape"}
+{"image": "images/calib/008.png", "question": "Is there a blue square in the image?", "label": 0, "neg_type": "same_shape_other_color"}
+{"image": "images/calib/008.png", "question": "Is the black ellipse on the right side of the image?", "label": 0, "neg_type": "wrong_position"}
+{"image": "images/calib/008.png", "question": "Are there two black ellipses in the image?", "label": 0, "neg_type": "wrong_count"}
+{"image": "images/calib/009.png", "question": "Is there a yellow rect in the image?", "label": 1, "neg_type": null}
+{"image": "images/calib/009.png", "question": "Is there a brown circle in the image?", "label": 1, "neg_type": null}
 {"image": "images/calib/009.png", "question": "Is there a red square in the image?", "label": 0, "neg_type": "easy_negative"}
 {"image": "images/calib/009.png", "question": "Is there a blue square in the image?", "label": 0, "neg_type": "same_color_other_shape"}
 {"image": "images/calib/009.png", "question": "Is there a red circle in the image?", "label": 0, "neg_type": "same_shape_other_color"}
-{"image": "images/calib/009.png", "question": "Is the blue rect on the right side of the image?", "label": 0, "neg_type": "wrong_position"}
-{"image": "images/calib/009.png", "question": "Are there two blue rects in the image?", "label": 0, "neg_type": "wrong_count"}
-{"image": "images/calib/010.png", "question": "Is there a green rect in the image?", "label": 1, "neg_type": null}
-{"image": "images/calib/010.png", "question": "Is there a black circle in the image?", "label": 1, "neg_type": null}
-{"image": "images/calib/010.png", "question": "Is there a blue square in the image?", "label": 0, "neg_type": "easy_negative"}
-{"image": "images/calib/010.png", "question": "Is there a red square in the image?", "label": 0, "neg_type": "same_color_other_shape"}
+{"image": "images/calib/009.png", "question": "Is the orange ellipse on the right side of the image?", "label": 0, "neg_type": "wrong_position"}
+{"image": "images/calib/009.png", "question": "Are there two orange ellipses in the image?", "label": 0, "neg_type": "wrong_count"}
+{"image": "images/calib/010.png", "question": "Is there a purple ellipse in the image?", "label": 1, "neg_type": null}
+{"image": "images/calib/010.png", "question": "Is there a black square in the image?", "label": 1, "neg_type": null}
+{"image": "images/calib/010.png", "question": "Is there a blue triangle in the image?", "label": 0, "neg_type": "easy_negative"}
+{"image": "images/calib/010.png", "question": "Is there a red triangle in the image?", "label": 0, "neg_type": "same_color_other_shape"}
 {"image": "images/calib/010.png", "question": "Is there a blue circle in the image?", "label": 0, "neg_type": "same_shape_other_color"}
-{"image": "images/calib/010.png", "question": "Is the black triangle on the right side of the image?", "label": 0, "neg_type": "wrong_position"}
-{"image": "images/calib/010.png", "question": "Are there two black triangles in the image?", "label": 0, "neg_type": "wrong_count"}
-{"image": "images/calib/011.png", "question": "Is there a orange triangle in the image?", "label": 1, "neg_type": null}
-{"image": "images/calib/011.png", "question": "Is there a purple rect in the image?", "label": 1, "neg_type": null}
-{"image": "images/calib/011.png", "question": "Is there a yellow circle in the image?", "label": 0, "neg_type": "easy_negative"}
-{"image": "images/calib/011.png", "question": "Is there a red circle in the image?", "label": 0, "neg_type": "same_color_other_shape"}
-{"image": "images/calib/011.png", "question": "Is there a yellow square in the image?", "label": 0, "neg_type": "same_shape_other_color"}
-{"image": "images/calib/011.png", "question": "Is the blue triangle on the right side of the image?", "label": 0, "neg_type": "wrong_position"}
-{"image": "images/calib/011.png", "question": "Are there two blue triangles in the image?", "label": 0, "neg_type": "wrong_count"}
-{"image": "images/calib/012.png", "question": "Is there a orange square in the image?", "label": 1, "neg_type": null}
-{"image": "images/calib/012.png", "question": "Is there a blue square in the image?", "label": 1, "neg_type": null}
-{"image": "images/calib/012.png", "question": "Is there a purple circle in the image?", "label": 0, "neg_type": "easy_negative"}
-{"image": "images/calib/012.png", "question": "Is there a red circle in the image?", "label": 0, "neg_type": "same_color_other_shape"}
-{"image": "images/calib/012.png", "question": "Is there a purple square in the image?", "label": 0, "neg_type": "same_shape_other_color"}
-{"image": "images/calib/012.png", "question": "Is the red rect on the right side of the image?", "label": 0, "neg_type": "wrong_position"}
-{"image": "images/calib/012.png", "question": "Are there two red rects in the image?", "label": 0, "neg_type": "wrong_count"}
-{"image": "images/calib/013.png", "question": "Is there a purple circle in the image?", "label": 1, "neg_type": null}
-{"image": "images/calib/013.png", "question": "Is there a black circle in the image?", "label": 1, "neg_type": null}
-{"image": "images/calib/013.png", "question": "Is there a red triangle in the image?", "label": 0, "neg_type": "easy_negative"}
-{"image": "images/calib/013.png", "question": "Is there a blue triangle in the image?", "label": 0, "neg_type": "same_color_other_shape"}
-{"image": "images/calib/013.png", "question": "Is there a red circle in the image?", "label": 0, "neg_type": "same_shape_other_color"}
-{"image": "images/calib/013.png", "question": "Is the blue ellipse on the right side of the image?", "label": 0, "neg_type": "wrong_position"}
-{"image": "images/calib/013.png", "question": "Are there two blue ellipses in the image?", "label": 0, "neg_type": "wrong_count"}
-{"image": "images/calib/014.png", "question": "Is there a red triangle in the image?", "label": 1, "neg_type": null}
-{"image": "images/calib/014.png", "question": "Is there a orange ellipse in the image?", "label": 1, "neg_type": null}
-{"image": "images/calib/014.png", "question": "Is there a green square in the image?", "label": 0, "neg_type": "easy_negative"}
-{"image": "images/calib/014.png", "question": "Is there a red square in the image?", "label": 0, "neg_type": "same_color_other_shape"}
-{"image": "images/calib/014.png", "question": "Is there a green circle in the image?", "label": 0, "neg_type": "same_shape_other_color"}
-{"image": "images/calib/014.png", "question": "Is the orange ellipse on the right side of the image?", "label": 0, "neg_type": "wrong_position"}
-{"image": "images/calib/014.png", "question": "Are there two orange ellipses in the image?", "label": 0, "neg_type": "wrong_count"}
-{"image": "images/calib/015.png", "question": "Is there a black rect in the image?", "label": 1, "neg_type": null}
-{"image": "images/calib/015.png", "question": "Is there a orange circle in the image?", "label": 1, "neg_type": null}
-{"image": "images/calib/015.png", "question": "Is there a blue square in the image?", "label": 0, "neg_type": "easy_negative"}
-{"image": "images/calib/015.png", "question": "Is there a red square in the image?", "label": 0, "neg_type": "same_color_other_shape"}
-{"image": "images/calib/015.png", "question": "Is there a blue circle in the image?", "label": 0, "neg_type": "same_shape_other_color"}
-{"image": "images/calib/015.png", "question": "Is the purple ellipse on the right side of the image?", "label": 0, "neg_type": "wrong_position"}
-{"image": "images/calib/015.png", "question": "Are there two purple ellipses in the image?", "label": 0, "neg_type": "wrong_count"}
-{"image": "images/calib/016.png", "question": "Is there a black circle in the image?", "label": 1, "neg_type": null}
-{"image": "images/calib/016.png", "question": "Is there a blue triangle in the image?", "label": 1, "neg_type": null}
-{"image": "images/calib/016.png", "question": "Is there a red circle in the image?", "label": 0, "neg_type": "same_shape_other_color"}
-{"image": "images/calib/016.png", "question": "Is the yellow square on the right side of the image?", "label": 0, "neg_type": "wrong_position"}
-{"image": "images/calib/016.png", "question": "Are there two yellow squares in the image?", "label": 0, "neg_type": "wrong_count"}
-{"image": "images/calib/017.png", "question": "Is there a orange circle in the image?", "label": 1, "neg_type": null}
-{"image": "images/calib/017.png", "question": "Is there a orange rect in the image?", "label": 1, "neg_type": null}
-{"image": "images/calib/017.png", "question": "Is there a red square in the image?", "label": 0, "neg_type": "easy_negative"}
-{"image": "images/calib/017.png", "question": "Is there a blue square in the image?", "label": 0, "neg_type": "same_color_other_shape"}
-{"image": "images/calib/017.png", "question": "Is there a red circle in the image?", "label": 0, "neg_type": "same_shape_other_color"}
-{"image": "images/calib/017.png", "question": "Is the orange circle on the right side of the image?", "label": 0, "neg_type": "wrong_position"}
-{"image": "images/calib/017.png", "question": "Are there two orange circles in the image?", "label": 0, "neg_type": "wrong_count"}
-{"image": "images/calib/018.png", "question": "Is there a purple triangle in the image?", "label": 1, "neg_type": null}
-{"image": "images/calib/018.png", "question": "Is there a red ellipse in the image?", "label": 1, "neg_type": null}
-{"image": "images/calib/018.png", "question": "Is there a blue square in the image?", "label": 0, "neg_type": "easy_negative"}
-{"image": "images/calib/018.png", "question": "Is there a red square in the image?", "label": 0, "neg_type": "same_color_other_shape"}
+{"image": "images/calib/010.png", "question": "Is the purple ellipse on the right side of the image?", "label": 0, "neg_type": "wrong_position"}
+{"image": "images/calib/010.png", "question": "Are there two purple ellipses in the image?", "label": 0, "neg_type": "wrong_count"}
+{"image": "images/calib/011.png", "question": "Is there a blue square in the image?", "label": 1, "neg_type": null}
+{"image": "images/calib/011.png", "question": "Is there a yellow ellipse in the image?", "label": 1, "neg_type": null}
+{"image": "images/calib/011.png", "question": "Is there a red rect in the image?", "label": 0, "neg_type": "easy_negative"}
+{"image": "images/calib/011.png", "question": "Is there a blue rect in the image?", "label": 0, "neg_type": "same_color_other_shape"}
+{"image": "images/calib/011.png", "question": "Is there a red circle in the image?", "label": 0, "neg_type": "same_shape_other_color"}
+{"image": "images/calib/011.png", "question": "Is the black triangle on the right side of the image?", "label": 0, "neg_type": "wrong_position"}
+{"image": "images/calib/011.png", "question": "Are there two black triangles in the image?", "label": 0, "neg_type": "wrong_count"}
+{"image": "images/calib/012.png", "question": "Is there a orange ellipse in the image?", "label": 1, "neg_type": null}
+{"image": "images/calib/012.png", "question": "Is there a red circle in the image?", "label": 1, "neg_type": null}
+{"image": "images/calib/012.png", "question": "Is there a blue square in the image?", "label": 0, "neg_type": "easy_negative"}
+{"image": "images/calib/012.png", "question": "Is there a red square in the image?", "label": 0, "neg_type": "same_color_other_shape"}
+{"image": "images/calib/012.png", "question": "Is there a blue circle in the image?", "label": 0, "neg_type": "same_shape_other_color"}
+{"image": "images/calib/012.png", "question": "Is the red circle on the right side of the image?", "label": 0, "neg_type": "wrong_position"}
+{"image": "images/calib/012.png", "question": "Are there two red circles in the image?", "label": 0, "neg_type": "wrong_count"}
+{"image": "images/calib/013.png", "question": "Is there a blue rect in the image?", "label": 1, "neg_type": null}
+{"image": "images/calib/013.png", "question": "Is there a red triangle in the image?", "label": 1, "neg_type": null}
+{"image": "images/calib/013.png", "question": "Is there a green circle in the image?", "label": 0, "neg_type": "easy_negative"}
+{"image": "images/calib/013.png", "question": "Is there a red circle in the image?", "label": 0, "neg_type": "same_color_other_shape"}
+{"image": "images/calib/013.png", "question": "Is there a green square in the image?", "label": 0, "neg_type": "same_shape_other_color"}
+{"image": "images/calib/013.png", "question": "Is the blue rect on the right side of the image?", "label": 0, "neg_type": "wrong_position"}
+{"image": "images/calib/013.png", "question": "Are there two blue rects in the image?", "label": 0, "neg_type": "wrong_count"}
+{"image": "images/calib/014.png", "question": "Is there a black rect in the image?", "label": 1, "neg_type": null}
+{"image": "images/calib/014.png", "question": "Is there a orange circle in the image?", "label": 1, "neg_type": null}
+{"image": "images/calib/014.png", "question": "Is there a blue triangle in the image?", "label": 0, "neg_type": "easy_negative"}
+{"image": "images/calib/014.png", "question": "Is there a red triangle in the image?", "label": 0, "neg_type": "same_color_other_shape"}
+{"image": "images/calib/014.png", "question": "Is there a blue circle in the image?", "label": 0, "neg_type": "same_shape_other_color"}
+{"image": "images/calib/014.png", "question": "Is the red ellipse on the right side of the image?", "label": 0, "neg_type": "wrong_position"}
+{"image": "images/calib/014.png", "question": "Are there two red ellipses in the image?", "label": 0, "neg_type": "wrong_count"}
+{"image": "images/calib/015.png", "question": "Is there a cyan triangle in the image?", "label": 1, "neg_type": null}
+{"image": "images/calib/015.png", "question": "Is there a yellow triangle in the image?", "label": 1, "neg_type": null}
+{"image": "images/calib/015.png", "question": "Is there a red rect in the image?", "label": 0, "neg_type": "easy_negative"}
+{"image": "images/calib/015.png", "question": "Is there a blue rect in the image?", "label": 0, "neg_type": "same_color_other_shape"}
+{"image": "images/calib/015.png", "question": "Is there a red circle in the image?", "label": 0, "neg_type": "same_shape_other_color"}
+{"image": "images/calib/015.png", "question": "Is the purple square on the right side of the image?", "label": 0, "neg_type": "wrong_position"}
+{"image": "images/calib/015.png", "question": "Are there two purple squares in the image?", "label": 0, "neg_type": "wrong_count"}
+{"image": "images/calib/016.png", "question": "Is there a cyan square in the image?", "label": 1, "neg_type": null}
+{"image": "images/calib/016.png", "question": "Is there a yellow circle in the image?", "label": 1, "neg_type": null}
+{"image": "images/calib/016.png", "question": "Is there a blue circle in the image?", "label": 0, "neg_type": "same_shape_other_color"}
+{"image": "images/calib/016.png", "question": "Is the green ellipse on the right side of the image?", "label": 0, "neg_type": "wrong_position"}
+{"image": "images/calib/016.png", "question": "Are there two green ellipses in the image?", "label": 0, "neg_type": "wrong_count"}
+{"image": "images/calib/017.png", "question": "Is there a red square in the image?", "label": 1, "neg_type": null}
+{"image": "images/calib/017.png", "question": "Is there a yellow triangle in the image?", "label": 1, "neg_type": null}
+{"image": "images/calib/017.png", "question": "Is there a orange circle in the image?", "label": 0, "neg_type": "easy_negative"}
+{"image": "images/calib/017.png", "question": "Is there a red circle in the image?", "label": 0, "neg_type": "same_color_other_shape"}
+{"image": "images/calib/017.png", "question": "Is there a orange square in the image?", "label": 0, "neg_type": "same_shape_other_color"}
+{"image": "images/calib/017.png", "question": "Is the blue ellipse on the right side of the image?", "label": 0, "neg_type": "wrong_position"}
+{"image": "images/calib/017.png", "question": "Are there two blue ellipses in the image?", "label": 0, "neg_type": "wrong_count"}
+{"image": "images/calib/018.png", "question": "Is there a cyan triangle in the image?", "label": 1, "neg_type": null}
+{"image": "images/calib/018.png", "question": "Is there a purple ellipse in the image?", "label": 1, "neg_type": null}
 {"image": "images/calib/018.png", "question": "Is there a blue circle in the image?", "label": 0, "neg_type": "same_shape_other_color"}
-{"image": "images/calib/018.png", "question": "Is the red ellipse on the right side of the image?", "label": 0, "neg_type": "wrong_position"}
-{"image": "images/calib/018.png", "question": "Are there two red ellipses in the image?", "label": 0, "neg_type": "wrong_count"}
-{"image": "images/calib/019.png", "question": "Is there a green rect in the image?", "label": 1, "neg_type": null}
-{"image": "images/calib/019.png", "question": "Is there a red square in the image?", "label": 1, "neg_type": null}
-{"image": "images/calib/019.png", "question": "Is there a yellow circle in the image?", "label": 0, "neg_type": "easy_negative"}
-{"image": "images/calib/019.png", "question": "Is there a red circle in the image?", "label": 0, "neg_type": "same_color_other_shape"}
-{"image": "images/calib/019.png", "question": "Is there a yellow square in the image?", "label": 0, "neg_type": "same_shape_other_color"}
-{"image": "images/calib/019.png", "question": "Is the green rect on the right side of the image?", "label": 0, "neg_type": "wrong_position"}
-{"image": "images/calib/019.png", "question": "Are there two green rects in the image?", "label": 0, "neg_type": "wrong_count"}
-{"image": "images/calib/020.png", "question": "Is there a brown ellipse in the image?", "label": 1, "neg_type": null}
-{"image": "images/calib/020.png", "question": "Is there a black square in the image?", "label": 1, "neg_type": null}
-{"image": "images/calib/020.png", "question": "Is there a red circle in the image?", "label": 0, "neg_type": "easy_negative"}
-{"image": "images/calib/020.png", "question": "Is there a yellow circle in the image?", "label": 0, "neg_type": "same_color_other_shape"}
-{"image": "images/calib/020.png", "question": "Is there a red square in the image?", "label": 0, "neg_type": "same_shape_other_color"}
-{"image": "images/calib/020.png", "question": "Is the yellow triangle on the right side of the image?", "label": 0, "neg_type": "wrong_position"}
-{"image": "images/calib/020.png", "question": "Are there two yellow triangles in the image?", "label": 0, "neg_type": "wrong_count"}
+{"image": "images/calib/018.png", "question": "Is the black circle on the right side of the image?", "label": 0, "neg_type": "wrong_position"}
+{"image": "images/calib/018.png", "question": "Are there two black circles in the image?", "label": 0, "neg_type": "wrong_count"}
+{"image": "images/calib/019.png", "question": "Is there a black circle in the image?", "label": 1, "neg_type": null}
+{"image": "images/calib/019.png", "question": "Is there a brown square in the image?", "label": 1, "neg_type": null}
+{"image": "images/calib/019.png", "question": "Is there a blue circle in the image?", "label": 0, "neg_type": "same_shape_other_color"}
+{"image": "images/calib/019.png", "question": "Is the brown square on the right side of the image?", "label": 0, "neg_type": "wrong_position"}
+{"image": "images/calib/019.png", "question": "Are there two brown squares in the image?", "label": 0, "neg_type": "wrong_count"}
+{"image": "images/calib/020.png", "question": "Is there a green circle in the image?", "label": 1, "neg_type": null}
+{"image": "images/calib/020.png", "question": "Is there a blue triangle in the image?", "label": 1, "neg_type": null}
+{"image": "images/calib/020.png", "question": "Is there a red ellipse in the image?", "label": 0, "neg_type": "easy_negative"}
+{"image": "images/calib/020.png", "question": "Is there a blue ellipse in the image?", "label": 0, "neg_type": "same_color_other_shape"}
+{"image": "images/calib/020.png", "question": "Is there a red circle in the image?", "label": 0, "neg_type": "same_shape_other_color"}
+{"image": "images/calib/020.png", "question": "Is the black square on the right side of the image?", "label": 0, "neg_type": "wrong_position"}
+{"image": "images/calib/020.png", "question": "Are there two black squares in the image?", "label": 0, "neg_type": "wrong_count"}

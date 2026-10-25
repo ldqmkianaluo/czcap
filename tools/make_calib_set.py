@@ -94,14 +94,41 @@ def build_scene(rng: random.Random):
                     break
             used.add((kind, color))
 
-            size = rng.randint(55, 90)
-            x0 = int(c * cw + rng.randint(6, max(6, int(cw - size - 6))))
-            y0 = int(r * ch + rng.randint(6, max(6, int(ch - size - 6))))
-            x0 = min(x0, W - size - 2)
-            y0 = min(y0, H - size - 2)
-            x1, y1 = x0 + size, y0 + size
+            # 尺寸必须让形状在**视觉上可区分**。原先宽高都取同一个 size，结果
+            # 所有 rect / ellipse 都画成了完美正方形和正圆——于是"图中有 red rect"
+            # 时去问"Is there a red square?"，模型答 yes 完全正确，而标准答案却把它
+            # 标成"不存在"。这个 bug 让整批标定标签失效过一次，代价很大。
+            # 现在 rect / ellipse 强制明显的非方形长宽比。
+            if kind in ("circle", "square", "triangle"):
+                bw = bh = rng.randint(55, 85)
+            else:
+                if rng.random() < 0.5:
+                    bw, bh = rng.randint(95, 130), rng.randint(45, 60)
+                else:
+                    bw, bh = rng.randint(45, 60), rng.randint(95, 130)
+
+            x0 = int(c * cw + rng.randint(4, max(4, int(cw - bw - 4))))
+            y0 = int(r * ch + rng.randint(4, max(4, int(ch - bh - 4))))
+            x0 = max(2, min(x0, W - bw - 2))
+            y0 = max(2, min(y0, H - bh - 2))
+            x1, y1 = x0 + bw, y0 + bh
             norm = (x0 / W, y0 / H, x1 / W, y1 / H)
             shapes.append((kind, color, (x0, y0, x1, y1), norm))
+
+    # 守卫：标准答案必须与"视觉上能看到的"一致。曾经因为宽高恒等，rect 画成了
+    # 正方形、ellipse 画成了圆，导致"图中有 red rect"时问"Is there a red square?"
+    # 模型答 yes 完全正确，而标签却写成"不存在"——整批标定数据因此失效。
+    for kind, _color, b, _norm in shapes:
+        bw, bh = b[2] - b[0], b[3] - b[1]
+        ratio = max(bw, bh) / max(1, min(bw, bh))
+        if kind in ("rect", "ellipse"):
+            assert ratio >= 1.5, (
+                f"{kind} 的长宽比只有 {ratio:.2f}，视觉上与 square/circle 无法区分，"
+                f"会导致标准答案失真"
+            )
+        else:
+            assert ratio <= 1.05, f"{kind} 的长宽比为 {ratio:.2f}，应当接近 1"
+
     return shapes
 
 
