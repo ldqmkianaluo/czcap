@@ -887,6 +887,60 @@ async def probe_attribution_refined(
 
 
 # --------------------------------------------------------------------------
+# 提问改写：测试 A 的输入
+# --------------------------------------------------------------------------
+
+RE_EXIST = re.compile(r"^Is there a (\w+) (\w+) in the image\?$")
+RE_POSITION = re.compile(r"^Is the (\w+) (\w+) on the (left|right) side of the image\?$")
+RE_COUNT = re.compile(r"^Are there (\w+) (\w+) (\w+)s in the image\?$")
+
+
+def paraphrase_variants(question: str) -> list[str]:
+    """
+    生成语义等价的问法，用于测试 A（提问改写一致性）。
+
+    这里用模板而非让模型自己改写：模型改写的语义漂移无法控制，会让一致性
+    信号本身变得不可信——而一致性正是我们要测的东西。模板保证语义严格等价，
+    代价是覆盖的问法类型有限（只支持本项目的三类题型），这一点在报告中说明。
+
+    无法识别的句式返回原问题本身，此时测试 A 退化为"同一问题问一次"，
+    一致性恒为 1.0，不产生任何信息——调用方应据此判断该题是否可用。
+    """
+    q = question.strip()
+    q_no_suffix = q.split(" Answer with exactly one word")[0].strip()
+
+    m = RE_EXIST.match(q_no_suffix)
+    if m:
+        color, shape = m.group(1), m.group(2)
+        return [
+            f"Is there a {color} {shape} in the image?",
+            f"Does the image contain a {color} {shape}?",
+            f"Is a {color} {shape} present in the image?",
+            f"Can you see a {color} {shape} in the image?",
+        ]
+
+    m = RE_POSITION.match(q_no_suffix)
+    if m:
+        color, shape, side = m.group(1), m.group(2), m.group(3)
+        return [
+            f"Is the {color} {shape} on the {side} side of the image?",
+            f"Is the {color} {shape} located on the {side} side?",
+            f"Does the {color} {shape} appear on the {side} side of the image?",
+        ]
+
+    m = RE_COUNT.match(q_no_suffix)
+    if m:
+        num, color, shape = m.group(1), m.group(2), m.group(3)
+        return [
+            f"Are there {num} {color} {shape}s in the image?",
+            f"Does the image contain {num} {color} {shape}s?",
+            f"Are {num} {color} {shape}s present in the image?",
+        ]
+
+    return [q_no_suffix]
+
+
+# --------------------------------------------------------------------------
 # 指标计算
 # --------------------------------------------------------------------------
 
@@ -992,12 +1046,13 @@ async def run_pope_baseline(
 
 async def main() -> None:
     ap = argparse.ArgumentParser(description="HaluLens 评测骨架")
-    ap.add_argument("--task", default="pope_b0", choices=["pope_b0", "probe_demo", "attribution"])
+    ap.add_argument("--task", default="pope_b0",
+                    choices=["pope_b0", "probe_demo", "attribution", "calibrate"])
     ap.add_argument("--model", default="gpt-4o-mini")
     ap.add_argument("--data", type=Path, help="POPE jsonl 路径")
     ap.add_argument("--image", type=Path, help="probe_demo 用的单张图片")
     ap.add_argument("--question", default="Is there a cat in the image?")
-    ap.add_argument("--limit", type=int, default=100)
+    ap.add_argument("--limit", type=int, default=None, help="只评测前 N 条；默认全部（曾默认 100，导致静默漏评）")
     ap.add_argument("--out", type=Path, default=PROJECT_ROOT / "runs")
     ap.add_argument("--cache", type=Path, default=PROJECT_ROOT / ".cache" / "vlm")
     ap.add_argument("--concurrency", type=int, default=4)
@@ -1035,6 +1090,68 @@ async def main() -> None:
             print("\n=== B0 基线（POPE）===")
             for k, v in metrics.items():
                 print(f"  {k:20s} {v}")
+        elif args.task == "calibrate":
+            if not args.data:
+                raise SystemExit("--data 必填")
+            rows = load_pope(args.data)
+            if args.limit:
+                rows = rows[: args.limit]
+
+            # 只对**肯定式回答**做一致性测试。
+            # 否定式回答（"图中没有 X"）无法做归因，因为"不存在"不对应任何
+            # 图像区域；把它们混进来只会给阈值标定灌入噪声。
+            results: list[dict] = []
+            affirmative = 0
+
+            for i, rec in enumerate(rows, 1):
+                img = Image.open(rec["image"]).convert("RGB")
+                baseline = await client.ask_yesno(img, rec["question"], temperature=0.0)
+
+                item = {
+                    "idx": i,
+                    "image": rec["image"],
+                    "question": rec["question"],
+                    "label": rec["label"],          # 生成器标准答案：1 = 物体确实存在
+                    "neg_type": rec.get("neg_type"),
+                    "baseline_yes": baseline,
+                }
+
+                if baseline is True:
+                    affirmative += 1
+                    variants = paraphrase_variants(rec["question"])
+                    l1 = await probe_paraphrase(client, img, rec["question"], variants)
+                    l2 = await probe_perturbation(
+                        client, img, rec["question"],
+                        ("jpeg_recompress", "crop_5pct", "scale_90"),
+                    )
+                    item["l1_score"] = round(l1.score, 4)
+                    item["l2_score"] = round(l2.score, 4)
+                    item["n_variants"] = l1.n_variants
+                    item["l1_unparseable"] = l1.unparseable
+
+                results.append(item)
+                logger.log({"task": "calibrate", **item})
+                print(f"  [{i}/{len(rows)}] baseline={baseline} "
+                      f"l1={item.get('l1_score')} l2={item.get('l2_score')} "
+                      f"| {rec['question'][:52]}")
+
+            out = PROJECT_ROOT / "calib_scores.jsonl"
+            with out.open("w", encoding="utf-8") as fh:
+                for r in results:
+                    fh.write(json.dumps(r, ensure_ascii=False) + "\n")
+
+            yes_on_present = sum(1 for r in results if r["label"] == 1 and r["baseline_yes"])
+            yes_on_absent = sum(1 for r in results if r["label"] == 0 and r["baseline_yes"])
+            print(f"\n=== 标定数据采集完成 ===")
+            print(f"  题目总数        : {len(results)}")
+            print(f"  肯定式回答      : {affirmative}（只有这些能做一致性测试）")
+            print(f"    其中物体确实存在（主张正确）: {yes_on_present}")
+            print(f"    其中物体并不存在（主张错误）: {yes_on_absent}")
+            print(f"  否定式回答      : {len(results) - affirmative}（无法归因，已排除）")
+            print(f"  输出            : {out}")
+            if yes_on_absent < 10:
+                print(f"\n  ⚠ 错误主张只有 {yes_on_absent} 条，不足以支撑稳健的阈值标定。")
+                print(f"    标定需要两个类别各有足够样本，否则得到的阈值没有统计意义。")
         elif args.task == "attribution":
             if not args.image:
                 raise SystemExit("--image 必填")

@@ -169,7 +169,31 @@ except ValueError:
 
 print()
 print("=" * 60)
-print("7. openai SDK 接口形状检查")
+print("7. 提问改写 paraphrase_variants（测试 A 的输入）")
+print("=" * 60)
+
+v = H.paraphrase_variants("Is there a red circle in the image?")
+check("存在型题 -> 4 种问法", len(v), 4)
+check("首条与原问一致", v[0], "Is there a red circle in the image?")
+check("各种问法互不相同", len(set(v)), 4)
+
+v = H.paraphrase_variants("Is the red circle on the left side of the image?")
+check("位置型题 -> 3 种问法", len(v), 3)
+
+v = H.paraphrase_variants("Are there two red circles in the image?")
+check("数量型题 -> 3 种问法", len(v), 3)
+
+v = H.paraphrase_variants(
+    "Is there a red circle in the image? Answer with exactly one word: Yes or No."
+)
+check("能剥掉强制格式后缀", v[0], "Is there a red circle in the image?")
+
+v = H.paraphrase_variants("What color is the sky?")
+check("无法识别的句式退化为原句（此时测试 A 无信息量）", len(v), 1)
+
+print()
+print("=" * 60)
+print("8. openai SDK 接口形状检查")
 print("=" * 60)
 
 try:
