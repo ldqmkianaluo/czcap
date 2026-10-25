@@ -423,8 +423,8 @@ def occlude_box(
     """
     按归一化坐标 (x0, y0, x1, y1) 遮蔽任意矩形。
 
-    粗到细的精化需要在某个粗格子内部再划分网格，occlude_grid 只能按固定
-    网格划分整图，做不到这件事，所以需要这个更通用的版本。
+    滑动窗口探测、边缘收缩精化、以及证据区域核验都需要"按任意矩形操作
+    图像"，固定网格的 occlude_grid 做不到，所以需要这个更通用的版本。
     """
     out = img.convert("RGB").copy()
     w, h = out.size
@@ -434,6 +434,42 @@ def occlude_box(
     lower = max(upper + 1, int(y1 * h))
     out.paste(Image.new("RGB", (right - left, lower - upper), (fill, fill, fill)), (left, upper))
     return out
+
+
+def crop_box(
+    img: Image.Image, box_norm: tuple[float, float, float, float], pad: float = 0.05
+) -> Image.Image:
+    """
+    裁出归一化矩形对应的区域，四周留一点余量。
+
+    用途是**核验**：把证据区域单独裁出来，再问一次同样的问题。如果该区域
+    真的支持这个陈述，那么只看这块区域也应当得到同样的答案；如果答案变了，
+    说明模型虽然看对了地方，却做出了超出该区域内容的判断——也就是本项目
+    定义的「视觉误读型幻觉」。
+
+    留余量是因为裁得太紧可能把目标边缘切掉，反而造成假的"不支持"。
+    """
+    w, h = img.size
+    x0 = max(0.0, box_norm[0] - pad)
+    y0 = max(0.0, box_norm[1] - pad)
+    x1 = min(1.0, box_norm[2] + pad)
+    y1 = min(1.0, box_norm[3] + pad)
+    left, upper = int(x0 * w), int(y0 * h)
+    right = max(left + 8, int(x1 * w))
+    lower = max(upper + 8, int(y1 * h))
+    return img.crop((left, upper, right, lower))
+
+
+def merge_boxes(
+    boxes: list[tuple[float, float, float, float]],
+) -> tuple[float, float, float, float]:
+    """取一组区域的外接矩形。"""
+    return (
+        min(b[0] for b in boxes),
+        min(b[1] for b in boxes),
+        max(b[2] for b in boxes),
+        max(b[3] for b in boxes),
+    )
 
 
 # 与问题语义正交的图像变换。注意：若问题涉及颜色，亮度变换不满足正交性，
@@ -749,6 +785,12 @@ class RefinedAttribution:
     refined_boxes: list[Box]
     shrink_step: float
     calls: int
+    # 证据区域核验：把该区域单独裁出来后重问同一问题，答案是否仍与基线一致。
+    # True  = 该区域支持这个陈述；
+    # False = 看对了地方但判断超出了区域内容（视觉误读型幻觉）；
+    # None  = 未能核验（无可高亮区域，或答案解析失败）。
+    evidence_box: Box | None = None
+    supported: bool | None = None
 
     @property
     def has_visual_grounding(self) -> bool:
@@ -765,6 +807,8 @@ class RefinedAttribution:
             "refined_from": [list(b) for b in self.refined_from],
             "shrink_step": self.shrink_step,
             "refined_boxes": [list(b) for b in self.refined_boxes],
+            "evidence_box": list(self.evidence_box) if self.evidence_box else None,
+            "supported": self.supported,
             "has_visual_grounding": self.has_visual_grounding,
             "calls": self.calls,
         }
@@ -873,6 +917,27 @@ async def probe_attribution_refined(
         calls += used
         refined_boxes.append(tight)
 
+    # ---- 证据区域核验 ----
+    # 这一步是方法能不能察觉「视觉误读」的关键。
+    # 实测：模型回答"有两个红色椭圆"而图中只有一个时，遮蔽归因照样判
+    # "有视觉依据"——因为归因测的是答案对图像的依赖，不是答案的正确性。
+    # 把证据区域单独裁出来重问一次，若答案改变，说明模型看对了地方，
+    # 却做出了超出该区域内容的判断。
+    evidence_box: Box | None = None
+    supported: bool | None = None
+    if refined_boxes:
+        evidence_box = merge_boxes(refined_boxes)
+    elif flip_boxes:
+        evidence_box = merge_boxes(flip_boxes)
+
+    if evidence_box is not None and baseline is not None:
+        ans = await client.ask_yesno(
+            crop_box(image, evidence_box), question, temperature=0.0
+        )
+        calls += 1
+        if ans is not None:
+            supported = ans == baseline
+
     return RefinedAttribution(
         baseline=baseline,
         window=window,
@@ -883,6 +948,8 @@ async def probe_attribution_refined(
         refined_boxes=refined_boxes,
         shrink_step=shrink_step,
         calls=calls,
+        evidence_box=evidence_box,
+        supported=supported,
     )
 
 
@@ -1188,14 +1255,22 @@ async def main() -> None:
                         "否定式回答，且无任何区域能改变它。「不存在」本身不对应任何图像区域，"
                         "因此无可高亮属正常，不据此判为幻觉"
                     )
-            elif res.has_visual_grounding:
-                verdict = "有视觉依据：答案依赖高亮区域，可据此核验该区域是否真的支持该陈述"
-            else:
+            elif not res.has_visual_grounding:
                 verdict = (
-                    "⚠ 高疑似幻觉：模型给出了肯定式回答，却没有任何区域能影响它——"
-                    "该回答很可能并非来自图像内容"
+                    "⚠ 高疑似幻觉（无视觉依据型）：模型给出了肯定式回答，"
+                    "却没有任何区域能影响它——该回答很可能并非来自图像内容"
                 )
+            elif res.supported is False:
+                verdict = (
+                    "⚠ 高疑似幻觉（视觉误读型）：答案依赖高亮区域，但只看该区域时答案会改变——"
+                    "模型看对了地方，却做出了超出该区域内容的判断"
+                )
+            elif res.supported is True:
+                verdict = "陈述被其证据区域支持：只看高亮区域也能得到同样的答案"
+            else:
+                verdict = "有视觉依据，但证据区域核验未能解析，结论不确定"
 
+            evidence_crop = crop_box(img, res.evidence_box) if res.evidence_box else None
             out_img = make_attribution_figure(
                 img,
                 question=args.question,
@@ -1204,6 +1279,7 @@ async def main() -> None:
                 tested_boxes=res.tested_boxes,
                 flip_boxes=res.flip_boxes,
                 refined_boxes_norm=res.refined_boxes,
+                evidence_crop=evidence_crop,
                 calls=res.calls,
                 out_path=PROJECT_ROOT / "reports" / f"attribution-{meta.run_id}.png",
             )
@@ -1216,6 +1292,8 @@ async def main() -> None:
             print(f"  精化           : 对前 {len(res.refined_from)} 个翻转窗口做边缘收缩"
                   f"（步长 {res.shrink_step}），得证据区域 {len(res.refined_boxes)} 块")
             print(f"  是否有视觉依据 : {res.has_visual_grounding}")
+            supported_txt = {True: "支持", False: "不支持（视觉误读）", None: "无法核验"}[res.supported]
+            print(f"  证据区域核验   : {supported_txt}")
             print(f"  模型调用次数   : {res.calls}")
             print(f"  报告图         : {out_img}")
             logger.log(

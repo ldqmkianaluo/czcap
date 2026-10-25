@@ -4,9 +4,12 @@ viz.py —— 把遮蔽归因的结果画成一张可核验的图
 设计原则：这张图不是装饰，而是**证据**。看的人应该能一眼看出：
     1. 被测的是什么问题、模型原话是什么；
     2. 哪些区域被遮住后答案会翻转（这就是判定所依据的证据）；
-    3. 精化之后的证据区域具体落在哪里。
+    3. 收缩之后的证据区域落在哪里；
+    4. **只看这块证据区域，那句话到底成不成立**——这一格是察觉「视觉误读」
+       的关键，因为遮蔽归因只测"答案依赖图像"，不测"答案是否正确"。
 
-三联图：原图（含被测窗口）→ 遮蔽影响图 → 精化后的证据区域。
+所以是四联图：原图 → 遮蔽影响图 → 收缩后的证据区域 → 证据区域特写。
+没有证据区域时退化为三联图。
 
 排版按文字行数动态计算高度：模型回答长短不一，任何写死的高度都会在多行时
 发生重叠（这是实测踩过的坑）。
@@ -55,6 +58,16 @@ def _fit_width(img: Image.Image, width: int) -> Image.Image:
     return img.resize((width, max(1, int(img.height * ratio))), Image.LANCZOS)
 
 
+def _fit_into(img: Image.Image, box_w: int, box_h: int) -> Image.Image:
+    """等比缩放到能塞进 box_w × box_h 里，居中放在灰底上（不拉伸变形）。"""
+    ratio = min(box_w / img.width, box_h / img.height)
+    w, h = max(1, int(img.width * ratio)), max(1, int(img.height * ratio))
+    scaled = img.resize((w, h), Image.LANCZOS)
+    canvas = Image.new("RGB", (box_w, box_h), (238, 238, 238))
+    canvas.paste(scaled, ((box_w - w) // 2, (box_h - h) // 2))
+    return canvas
+
+
 def _px_box(box: Box, w: int, h: int) -> tuple[int, int, int, int]:
     x0, y0, x1, y1 = box
     return (int(x0 * w), int(y0 * h), int(x1 * w), int(y1 * h))
@@ -94,25 +107,28 @@ def make_attribution_figure(
     refined_boxes_norm: list[Box],
     calls: int,
     out_path: Path,
-    panel_w: int = 440,
+    evidence_crop: Image.Image | None = None,
+    panel_w: int = 400,
 ) -> Path:
     """
-    生成三联图并保存。
+    生成四联图并保存。evidence_crop 为空时退化为三联图。
 
     tested_boxes       所有被测过的遮蔽窗口（归一化坐标，带重叠）
     flip_boxes         其中使答案翻转的窗口——它们就是判定的依据
     refined_boxes_norm 边缘收缩后得到的证据区域
+    evidence_crop      证据区域的特写，用来判断该区域是否真的支持该陈述
     """
     base0 = _fit_width(image.convert("RGB"), panel_w)
     ph = base0.height
 
-    margin, gap = 26, 20
+    n_panels = 4 if evidence_crop is not None else 3
+    margin, gap = 24, 18
     f_title = load_font(26)
     f_sub = load_font(18)
     f_label = load_font(19)
     f_small = load_font(16)
 
-    W = margin * 2 + gap * 2 + panel_w * 3
+    W = margin * 2 + gap * (n_panels - 1) + panel_w * n_panels
     text_w = W - margin * 2
     chars_sub = max(20, int(text_w / 9.8))
     chars_small = max(20, int(text_w / 8.6))
@@ -150,10 +166,15 @@ def make_attribution_figure(
     yy += _draw_lines(draw, margin, yy, q_lines, f_sub, INK)
     _draw_lines(draw, margin, yy, a_lines, f_sub, MUTED)
 
-    # ---- 三联面板 ----
-    labels = ["① 原图（浅线为被测窗口）", "② 遮蔽影响图", "③ 收缩后的证据区域"]
+    # ---- 面板 ----
+    labels = [
+        "① 原图（浅线为被测窗口）",
+        "② 遮蔽影响图",
+        "③ 收缩后的证据区域",
+        "④ 证据区域特写（核验用）",
+    ]
 
-    for i in range(3):
+    for i in range(n_panels):
         px = margin + i * (panel_w + gap)
         base = base0.copy()
 
@@ -174,7 +195,7 @@ def make_attribution_figure(
                 )
             base = Image.alpha_composite(base.convert("RGBA"), overlay).convert("RGB")
 
-        else:
+        elif i == 2:
             overlay = Image.new("RGBA", base.size, (0, 0, 0, 0))
             od = ImageDraw.Draw(overlay)
             for b in refined_boxes_norm:
@@ -185,6 +206,9 @@ def make_attribution_figure(
                     width=3,
                 )
             base = Image.alpha_composite(base.convert("RGBA"), overlay).convert("RGB")
+
+        else:
+            base = _fit_into(evidence_crop.convert("RGB"), panel_w, ph)
 
         canvas.paste(base, (px, panel_y))
         draw.rectangle((px, panel_y, px + panel_w, panel_y + ph), outline=(214, 214, 214))
