@@ -51,6 +51,10 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 # 每一次调用都变贵，而这类失控只是少数。
 TRUNCATION_MAX_TOKENS = 4096
 
+# 默认被检测模型。可用环境变量 VLM_MODEL 覆盖，也可用 --model 临时指定。
+# 单独抽成常量是因为 server.py 等调用方需要知道当前用的是哪个模型。
+DEFAULT_MODEL = os.environ.get("VLM_MODEL", "deepseek-v4-flash-vision-exp")
+
 
 # --------------------------------------------------------------------------
 # 运行记录：每次实验必须留下可复现的元信息
@@ -1115,7 +1119,7 @@ async def main() -> None:
     ap = argparse.ArgumentParser(description="HaluLens 评测骨架")
     ap.add_argument("--task", default="pope_b0",
                     choices=["pope_b0", "probe_demo", "attribution", "calibrate"])
-    ap.add_argument("--model", default="gpt-4o-mini")
+    ap.add_argument("--model", default=DEFAULT_MODEL)
     ap.add_argument("--data", type=Path, help="POPE jsonl 路径")
     ap.add_argument("--image", type=Path, help="probe_demo 用的单张图片")
     ap.add_argument("--question", default="Is there a cat in the image?")

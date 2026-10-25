@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>HaluLens · 视觉大模型幻觉检测</title>
+<style>
+  :root {
+    --bg: #0f1115;
+    --panel: #171a21;
+    --panel-2: #1e222b;
+    --line: #2a2f3a;
+    --ink: #e8ebf0;
+    --muted: #8b93a3;
+    --accent: #4d8bf0;
+    --ok: #35b56f;
+    --warn: #e0a13a;
+    --bad: #e05252;
+    --radius: 12px;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font-family: -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif;
+    font-size: 14px; line-height: 1.6;
+  }
+  header {
+    padding: 22px 28px 18px; border-bottom: 1px solid var(--line);
+    display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap;
+  }
+  header h1 { margin: 0; font-size: 19px; font-weight: 650; letter-spacing: .2px; }
+  header .sub { color: var(--muted); font-size: 13px; }
+  header .model {
+    margin-left: auto; font-size: 12px; color: var(--muted);
+    border: 1px solid var(--line); border-radius: 20px; padding: 3px 10px;
+  }
+  main {
+    display: grid; grid-template-columns: 380px 1fr; gap: 20px;
+    padding: 20px 28px 40px; align-items: start;
+  }
+  @media (max-width: 980px) { main { grid-template-columns: 1fr; } }
+
+  .card {
+    background: var(--panel); border: 1px solid var(--line);
+    border-radius: var(--radius); padding: 16px;
+  }
+  .card h2 {
+    margin: 0 0 12px; font-size: 13px; font-weight: 600;
+    color: var(--muted); letter-spacing: .6px; text-transform: uppercase;
+  }
+
+  #drop {
+    border: 1.5px dashed var(--line); border-radius: 10px; padding: 26px 14px;
+    text-align: center; color: var(--muted); cursor: pointer;
+    transition: border-color .15s, background .15s; background: var(--panel-2);
+  }
+  #drop.hover { border-color: var(--accent); background: #1b2432; }
+  #drop.hasimg { padding: 0; border-style: solid; overflow: hidden; }
+  #drop img { display: block; width: 100%; height: auto; }
+  #drop .hint { font-size: 12px; margin-top: 6px; opacity: .75; }
+
+  label.field { display: block; margin-top: 14px; font-size: 13px; color: var(--muted); }
+  input[type=text] {
+    width: 100%; margin-top: 6px; padding: 10px 12px; border-radius: 9px;
+    border: 1px solid var(--line); background: var(--panel-2); color: var(--ink);
+    font-size: 14px; font-family: inherit;
+  }
+  input[type=text]:focus { outline: none; border-color: var(--accent); }
+
+  .modes { display: flex; gap: 8px; margin-top: 8px; }
+  .modes button {
+    flex: 1; padding: 9px 8px; border-radius: 9px; cursor: pointer;
+    border: 1px solid var(--line); background: var(--panel-2);
+    color: var(--muted); font-size: 13px; font-family: inherit; text-align: center;
+  }
+  .modes button.on { border-color: var(--accent); color: var(--ink); background: #1b2432; }
+  .modes button small { display: block; font-size: 11px; opacity: .7; margin-top: 2px; }
+
+  #go {
+    width: 100%; margin-top: 16px; padding: 12px; border: none; border-radius: 10px;
+    background: var(--accent); color: #fff; font-size: 15px; font-weight: 600;
+    cursor: pointer; font-family: inherit;
+  }
+  #go:disabled { background: #2f3a4d; color: var(--muted); cursor: not-allowed; }
+
+  .bar { height: 4px; background: var(--line); border-radius: 3px; overflow: hidden; margin-top: 14px; }
+  .bar > i {
+    display: block; height: 100%; width: 30%; border-radius: 3px;
+    background: var(--accent); animation: slide 1.25s ease-in-out infinite;
+  }
+  @keyframes slide { 0%{margin-left:-30%} 100%{margin-left:100%} }
+  #status { margin-top: 8px; font-size: 12.5px; color: var(--muted); min-height: 20px; }
+
+  #verdict {
+    border-radius: 10px; padding: 14px 16px; margin-bottom: 16px;
+    border: 1px solid var(--line); background: var(--panel-2); display: none;
+  }
+  #verdict .tag {
+    display: inline-block; font-size: 11.5px; font-weight: 700; letter-spacing: .5px;
+    padding: 2px 9px; border-radius: 20px; margin-bottom: 8px;
+  }
+  #verdict .txt { font-size: 14.5px; }
+  #verdict.hallucination { border-color: #5a2b2b; background: #221618; }
+  #verdict.hallucination .tag { background: var(--bad); color: #fff; }
+  #verdict.ok { border-color: #24523a; background: #16211b; }
+  #verdict.ok .tag { background: var(--ok); color: #08210f; }
+  #verdict.grounded { border-color: #24415e; background: #16202b; }
+  #verdict.grounded .tag { background: var(--accent); color: #fff; }
+  #verdict.unknown .tag { background: var(--warn); color: #2b2103; }
+
+  .kv { display: grid; grid-template-columns: 96px 1fr; gap: 6px 12px; font-size: 13px; }
+  .kv dt { color: var(--muted); }
+  .kv dd { margin: 0; word-break: break-word; }
+
+  .overlay-wrap { position: relative; display: inline-block; max-width: 100%; margin-top: 4px; }
+  .overlay-wrap img { display: block; max-width: 100%; border-radius: 9px; }
+  .overlay-wrap .box {
+    position: absolute; border: 2.5px solid var(--bad);
+    background: rgba(224, 82, 82, .22); border-radius: 3px;
+  }
+
+  figure { margin: 0; }
+  figure img { width: 100%; border-radius: 9px; border: 1px solid var(--line); display: block; }
+  figcaption { font-size: 12px; color: var(--muted); margin-top: 8px; }
+
+  .err {
+    border: 1px solid #5a2b2b; background: #221618; color: #f0b9b9;
+    padding: 12px 14px; border-radius: 10px; font-size: 13px; white-space: pre-wrap;
+  }
+  .empty { color: var(--muted); font-size: 13.5px; padding: 26px 4px; text-align: center; }
+  a { color: var(--accent); }
+</style>
+</head>
+<body>
+<header>
+  <h1>HaluLens</h1>
+  <span class="sub">给黑盒视觉大模型做质检：这句话有图像依据吗？错在图上哪一块？</span>
+  <span class="model" id="modelTag">模型加载中…</span>
+</header>
+
+<main>
+  <section class="card">
+    <h2>输入</h2>
+
+    <div id="drop">
+      <div>点击选择图片，或把图片拖到这里</div>
+      <div class="hint">建议用真实照片。合成图对模型太简单，看不出差别。</div>
+    </div>
+    <input type="file" id="file" accept="image/*" hidden />
+
+    <label class="field" for="q">提问（Yes/No 形式效果最好）</label>
+    <input type="text" id="q" placeholder="例如：Is there a cat in the image?" />
+
+    <label class="field">检测模式</label>
+    <div class="modes" id="modes">
+      <button data-mode="quick" class="on">快速<small>约 5 次调用</small></button>
+      <button data-mode="full">完整<small>约 30–50 次<br>含边缘收缩</small></button>
+    </div>
+
+    <button id="go" disabled>开始检测</button>
+    <div class="bar" id="bar" style="display:none"><i></i></div>
+    <div id="status"></div>
+  </section>
+
+  <section class="card" id="result">
+    <h2>结果</h2>
+    <div class="empty" id="emptyTip">左侧上传图片并提问，然后点「开始检测」。</div>
+    <div id="verdict">
+      <span class="tag" id="vtag"></span>
+      <div class="txt" id="vtxt"></div>
+    </div>
+    <div id="detail" style="display:none">
+      <dl class="kv" id="kv"></dl>
+      <div id="overlayHost"></div>
+      <figure id="figHost" style="margin-top:18px; display:none">
+        <figcaption>证据图：① 原图与被测窗口　② 遮蔽影响　③ 收缩后的证据区域　④ 证据区域特写</figcaption>
+        <img id="figImg" alt="遮蔽归因证据图" />
+      </figure>
+    </div>
+    <div id="errHost"></div>
+  </section>
+</main>
+
+<script>
+(function () {
+  "use strict";
+
+  const $ = (id) => document.getElementById(id);
+  const drop = $("drop"), file = $("file"), q = $("q"), go = $("go");
+  const bar = $("bar"), status = $("status"), modes = $("modes");
+  const verdict = $("verdict"), vtag = $("vtag"), vtxt = $("vtxt");
+  const detail = $("detail"), kv = $("kv"), overlayHost = $("overlayHost");
+  const figHost = $("figHost"), figImg = $("figImg"), errHost = $("errHost");
+  const emptyTip = $("emptyTip");
+
+  let imageDataURL = null;   // 带 data: 前缀，用于本地预览
+  let mode = "quick";
+  let poller = null;
+  let ticker = null;
+  let startedAt = 0;
+
+  // ---- 启动：读一次健康检查，显示模型名 ----
+  fetch("/api/health").then(r => r.json()).then(d => {
+    $("modelTag").textContent = "被检测模型：" + d.model;
+  }).catch(() => { $("modelTag").textContent = "服务未就绪"; });
+
+  // ---- 选图 ----
+  function applyFile(f) {
+    if (!f || !f.type.startsWith("image/")) return;
+    const rd = new FileReader();
+    rd.onload = () => {
+      imageDataURL = rd.result;
+      drop.classList.add("hasimg");
+      drop.innerHTML = "";
+      const img = document.createElement("img");
+      img.src = imageDataURL;
+      drop.appendChild(img);
+      refresh();
+    };
+    rd.readAsDataURL(f);
+  }
+  drop.addEventListener("click", () => file.click());
+  file.addEventListener("change", (e) => applyFile(e.target.files[0]));
+  ["dragenter", "dragover"].forEach(ev =>
+    drop.addEventListener(ev, (e) => { e.preventDefault(); drop.classList.add("hover"); }));
+  ["dragleave", "drop"].forEach(ev =>
+    drop.addEventListener(ev, (e) => { e.preventDefault(); drop.classList.remove("hover"); }));
+  drop.addEventListener("drop", (e) => {
+    if (e.dataTransfer.files && e.dataTransfer.files[0]) applyFile(e.dataTransfer.files[0]);
+  });
+
+  q.addEventListener("input", refresh);
+  function refresh() {
+    go.disabled = !(imageDataURL && q.value.trim()) || go.dataset.busy === "1";
+  }
+
+  // ---- 模式切换 ----
+  modes.addEventListener("click", (e) => {
+    const b = e.target.closest("button[data-mode]");
+    if (!b) return;
+    mode = b.dataset.mode;
+    [...modes.querySelectorAll("button")].forEach(x => x.classList.toggle("on", x === b));
+  });
+
+  // ---- 提交 ----
+  go.addEventListener("click", async () => {
+    go.dataset.busy = "1"; go.disabled = true;
+    errHost.innerHTML = "";
+    verdict.style.display = "none";
+    detail.style.display = "none";
+    figHost.style.display = "none";
+    emptyTip.style.display = "none";
+    bar.style.display = "block";
+    startedAt = Date.now();
+    status.textContent = "提交中…";
+    clearInterval(ticker);
+    ticker = setInterval(() => {
+      status.textContent = status.dataset.stage
+        ? status.dataset.stage + `（已 ${Math.round((Date.now() - startedAt) / 1000)} 秒）`
+        : "处理中…";
+    }, 500);
+
+    try {
+      const resp = await fetch("/api/analyze", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ image: imageDataURL, question: q.value.trim(), mode })
+      });
+      const data = await resp.json();
+      if (!resp.ok) throw new Error(data.error || "提交失败");
+      poll(data.job_id);
+    } catch (err) {
+      fail(err.message);
+    }
+  });
+
+  function poll(jobId) {
+    clearInterval(poller);
+    poller = setInterval(async () => {
+      try {
+        const resp = await fetch("/api/job/" + jobId);
+        const job = await resp.json();
+        if (!resp.ok) throw new Error(job.error || "查询失败");
+        status.dataset.stage = job.stage || "";
+        status.textContent = (job.stage || "处理中") + `（已 ${Math.round((Date.now() - startedAt) / 1000)} 秒）`;
+
+        if (job.status === "done") { clearInterval(poller); finish(job.result); }
+        else if (job.status === "error") { clearInterval(poller); fail(job.error + "\n" + (job.traceback || "")); }
+      } catch (err) { clearInterval(poller); fail(err.message); }
+    }, 1200);
+  }
+
+  function fail(msg) {
+    clearInterval(poller); clearInterval(ticker);
+    bar.style.display = "none";
+    go.dataset.busy = "0"; refresh();
+    status.textContent = "";
+    errHost.innerHTML = '<div class="err"></div>';
+    errHost.firstChild.textContent = msg;
+  }
+
+  function finish(r) {
+    clearInterval(ticker);
+    bar.style.display = "none";
+    go.dataset.busy = "0"; refresh();
+    status.textContent = `完成，共 ${r.calls} 次模型调用`;
+
+    verdict.className = r.level;
+    verdict.style.display = "block";
+    vtag.textContent = ({
+      hallucination: "高疑似幻觉",
+      ok: "未发现幻觉",
+      grounded: "有视觉依据",
+      unknown: "结论不确定"
+    })[r.level] || r.level;
+    vtxt.textContent = r.verdict;
+
+    detail.style.display = "block";
+    kv.innerHTML = "";
+    const rows = [
+      ["提问", r.question],
+      ["模型回答", r.baseline_text],
+      ["被测窗口", `${r.tested} 个，其中答案翻转 ${r.flips} 个`],
+      ["证据区域", r.evidence_box
+        ? `x ${(r.evidence_box[0] * 100).toFixed(0)}–${(r.evidence_box[2] * 100).toFixed(0)}%, `
+        + `y ${(r.evidence_box[1] * 100).toFixed(0)}–${(r.evidence_box[3] * 100).toFixed(0)}%`
+        : "无（没有任何区域能影响答案）"],
+      ["区域核验", r.supported === true ? "支持该陈述"
+        : r.supported === false ? "不支持 —— 看对了地方但判断超出区域内容"
+        : "无法核验"],
+    ];
+    rows.forEach(([k, v]) => {
+      const dt = document.createElement("dt"); dt.textContent = k;
+      const dd = document.createElement("dd"); dd.textContent = v;
+      kv.appendChild(dt); kv.appendChild(dd);
+    });
+
+    // 在原图上叠加证据区域，方便对照
+    overlayHost.innerHTML = "";
+    if (r.evidence_box) {
+      const wrap = document.createElement("div");
+      wrap.className = "overlay-wrap";
+      const im = document.createElement("img");
+      im.src = imageDataURL;
+      const bx = document.createElement("div");
+      bx.className = "box";
+      bx.style.left = (r.evidence_box[0] * 100) + "%";
+      bx.style.top = (r.evidence_box[1] * 100) + "%";
+      bx.style.width = ((r.evidence_box[2] - r.evidence_box[0]) * 100) + "%";
+      bx.style.height = ((r.evidence_box[3] - r.evidence_box[1]) * 100) + "%";
+      wrap.appendChild(im); wrap.appendChild(bx);
+      overlayHost.appendChild(wrap);
+    }
+
+    if (r.figure) {
+      figImg.src = r.figure + "?t=" + Date.now();
+      figHost.style.display = "block";
+    }
+  }
+
+  refresh();
+})();
+</script>
+</body>
+</html>
