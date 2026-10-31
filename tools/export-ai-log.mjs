@@ -245,7 +245,10 @@ if (has('--inspect')) {
 
 // ---------------- 正式导出 ----------------
 
-const outDir = resolve(PROJECT_ROOT, valueOf('--out') || 'ai-logs');
+// 原始导出目录。默认写进 .ai-logs-raw/（已 gitignore），而不是 ai-logs/。
+// 原因：导出的是本机全部会话，其中绝大部分与项目无关、属于私人内容，
+// 直接落到可提交的目录里会有泄露风险。精选由 tools/index_ai_logs.py 完成。
+const outDir = resolve(PROJECT_ROOT, valueOf('--out') || '.ai-logs-raw');
 const only = valueOf('--session');
 mkdirSync(outDir, { recursive: true });
 
