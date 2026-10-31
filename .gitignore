@@ -28,3 +28,8 @@ data/
 
 # 注意：ai-logs/ 是**精选目录**，只放与本项目相关的会话，随仓库提交。
 # 由 tools/index_ai_logs.py --copy-to ai-logs 生成（会先清空再复制）。
+
+# pip 安装过程的临时目录与自定义库目录
+.tmp/
+.pylibs/
+
