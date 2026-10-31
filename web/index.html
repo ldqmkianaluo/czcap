@@ -321,6 +321,14 @@
       ["提问", r.question],
       ["模型回答", r.baseline_text],
       ["被测窗口", `${r.tested} 个，其中答案翻转 ${r.flips} 个`],
+      ["覆盖保证", r.coverage_px
+        ? `短边 ${Math.round(r.coverage_px)} 像素以内的目标可被完整遮住；更大的目标盖不住`
+        : "—"],
+      ["全图对照", r.whole_image_flips === true
+        ? "全遮后答案改变 → 模型确实在看图"
+        : r.whole_image_flips === false
+          ? "全遮后答案不变 → 模型没有使用图像"
+          : "不适用（已有区域能翻转答案）"],
       ["证据区域", r.evidence_box
         ? `x ${(r.evidence_box[0] * 100).toFixed(0)}–${(r.evidence_box[2] * 100).toFixed(0)}%, `
         + `y ${(r.evidence_box[1] * 100).toFixed(0)}–${(r.evidence_box[3] * 100).toFixed(0)}%`

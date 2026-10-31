@@ -112,8 +112,16 @@ async def _run_job(job_id: str, image_bytes: bytes, question: str, mode: str) ->
                 verdict = "否定式回答，且无任何区域能改变它。「不存在」不对应任何区域，无可高亮属正常，不据此判为幻觉"
                 level = "ok"
         elif not res.has_visual_grounding:
-            verdict = "高疑似幻觉（无视觉依据型）：模型给出肯定回答，却没有任何区域能影响它"
-            level = "hallucination"
+            if res.whole_image_flips is True:
+                verdict = ("有视觉依据（目标过大）：全遮整图会改变答案，说明答案依赖图像内容；"
+                           "但没有局部窗口能遮全目标，证据区域约等于整张图")
+                level = "grounded"
+            elif res.whole_image_flips is False:
+                verdict = "高疑似幻觉（无视觉依据型）：连整张图全遮住都不影响答案，模型根本没在看图像"
+                level = "hallucination"
+            else:
+                verdict = "没有窗口能改变答案，且全图遮蔽对照未能解析，结论不确定"
+                level = "unknown"
         elif res.supported is False:
             verdict = "高疑似幻觉（视觉误读型）：答案依赖高亮区域，但只看该区域时答案会改变"
             level = "hallucination"
@@ -157,6 +165,10 @@ async def _run_job(job_id: str, image_bytes: bytes, question: str, mode: str) ->
                 "level": level,
                 "has_visual_grounding": res.has_visual_grounding,
                 "supported": res.supported,
+                "whole_image_flips": res.whole_image_flips,
+                "coverage_px": round(
+                    (res.window - res.stride) * min(img.width, img.height), 1
+                ),
                 "tested": len(res.tested_boxes),
                 "flips": len(res.flip_boxes),
                 "refined_boxes": [list(b) for b in res.refined_boxes],

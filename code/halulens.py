@@ -795,6 +795,11 @@ class RefinedAttribution:
     # None  = 未能核验（无可高亮区域，或答案解析失败）。
     evidence_box: Box | None = None
     supported: bool | None = None
+    # 全图遮蔽对照：把整张图全遮住再问一次，用来区分两件容易被混为一谈的事。
+    # True  = 答案变了 → 模型确实在用图像，则"没有窗口翻转"只可能是窗口覆盖不足
+    # False = 答案没变 → 模型压根没看图，这时才谈得上"无视觉依据"
+    # None  = 未做（已有窗口翻转时无需此对照）
+    whole_image_flips: bool | None = None
 
     @property
     def has_visual_grounding(self) -> bool:
@@ -813,6 +818,7 @@ class RefinedAttribution:
             "refined_boxes": [list(b) for b in self.refined_boxes],
             "evidence_box": list(self.evidence_box) if self.evidence_box else None,
             "supported": self.supported,
+            "whole_image_flips": self.whole_image_flips,
             "has_visual_grounding": self.has_visual_grounding,
             "calls": self.calls,
         }
@@ -913,6 +919,21 @@ async def probe_attribution_refined(
     ]
     refined_from = flip_boxes[:max_refine_boxes]
 
+    # ---- 全图遮蔽对照 ----
+    # "没有任何窗口翻转"有两种完全不同的解释：模型没在看图，或者我的窗口
+    # 盖不住目标。两者必须分开，否则会把真实照片上明显有依据的回答误判成幻觉。
+    # 实测就撞过：一只几乎占满画面高度的猫，6 个窗口没有一个能完整遮住它，
+    # 于是被判定为"无视觉依据型幻觉"——完全错误。
+    # 把整张图全遮住再问一次即可区分：答案变了说明模型确实在用图像。
+    whole_image_flips: bool | None = None
+    if not flip_boxes and baseline is not None:
+        ans_full = await client.ask_yesno(
+            occlude_box(image, (0.0, 0.0, 1.0, 1.0)), question, temperature=0.0
+        )
+        calls += 1
+        if ans_full is not None:
+            whole_image_flips = ans_full != baseline
+
     refined_boxes: list[Box] = []
     for box in refined_from:
         tight, used = await shrink_box(
@@ -954,6 +975,7 @@ async def probe_attribution_refined(
         calls=calls,
         evidence_box=evidence_box,
         supported=supported,
+        whole_image_flips=whole_image_flips,
     )
 
 
@@ -1260,10 +1282,21 @@ async def main() -> None:
                         "因此无可高亮属正常，不据此判为幻觉"
                     )
             elif not res.has_visual_grounding:
-                verdict = (
-                    "⚠ 高疑似幻觉（无视觉依据型）：模型给出了肯定式回答，"
-                    "却没有任何区域能影响它——该回答很可能并非来自图像内容"
-                )
+                if res.whole_image_flips is True:
+                    # 全遮会改变答案，说明答案确实依赖图像内容；但没有任何局部窗口
+                    # 能遮全目标，说明目标大到接近整张图。此时"证据区域 ≈ 全图"，
+                    # 再谈局部归因没有意义——如实这么说，比给个"不确定"有用。
+                    verdict = (
+                        "有视觉依据（目标过大）：全遮整图会改变答案，说明答案依赖图像内容；"
+                        "但没有任何局部窗口能遮全目标，证据区域约等于整张图，无法进一步定位"
+                    )
+                elif res.whole_image_flips is False:
+                    verdict = (
+                        "⚠ 高疑似幻觉（无视觉依据型）：连整张图全遮住都不影响答案——"
+                        "模型根本没在看图像"
+                    )
+                else:
+                    verdict = "没有窗口能改变答案，且全图遮蔽对照未能解析，结论不确定"
             elif res.supported is False:
                 verdict = (
                     "⚠ 高疑似幻觉（视觉误读型）：答案依赖高亮区域，但只看该区域时答案会改变——"
@@ -1298,6 +1331,11 @@ async def main() -> None:
             print(f"  是否有视觉依据 : {res.has_visual_grounding}")
             supported_txt = {True: "支持", False: "不支持（视觉误读）", None: "无法核验"}[res.supported]
             print(f"  证据区域核验   : {supported_txt}")
+            wif = {True: "全遮后答案改变（模型确实在看图）",
+                   False: "全遮后答案不变（模型没有使用图像）",
+                   None: "不适用"}[res.whole_image_flips]
+            print(f"  全图遮蔽对照   : {wif}")
+            print(f"  判定           : {verdict}")
             print(f"  模型调用次数   : {res.calls}")
             print(f"  报告图         : {out_img}")
             logger.log(
