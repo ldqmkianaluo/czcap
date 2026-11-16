@@ -136,6 +136,25 @@ function truncate(s, n) {
 }
 
 /**
+ * 把记录里的 ISO 时间渲染成本地时间（UTC+8）。
+ *
+ * 为什么一定要逐条时间：赛事评分要看「过程可复现性与演进链路」，评审需要把
+ * 某一轮提问和某一天的提交对上。之前导出的快照只在文件头写了一个“记录时间”，
+ * 正文没有任何时间戳，评审无从判断先后，这一项等于没提供。
+ */
+function fmtTime(t) {
+  if (!t) return '';
+  const d = new Date(t);
+  if (Number.isNaN(d.getTime())) return '';
+  const x = new Date(d.getTime() + 8 * 3600 * 1000);
+  const p = (n) => String(n).padStart(2, '0');
+  return (
+    `${x.getUTCFullYear()}-${p(x.getUTCMonth() + 1)}-${p(x.getUTCDate())} ` +
+    `${p(x.getUTCHours())}:${p(x.getUTCMinutes())}`
+  );
+}
+
+/**
  * 客户端自动注入的上下文片段。
  *
  * DSH 会在每轮对话前注入一段运行时上下文（文件策略、审批策略等），它们在
@@ -152,15 +171,28 @@ function isInjectedContext(text) {
   return INJECTED_MARKERS.some((m) => t.startsWith(m) || t.includes(m));
 }
 
-/** 把一条记录渲染成 {who, body}；返回 null 表示这条不导出 */
+/**
+ * 后台任务回执同样不是用户输入的提问。
+ *
+ * 用户把一条命令放到后台跑完之后，DSH 会以 user/message 的形式投递一条
+ * 「background job pwsh-2 (pwsh: ...)」回执。它在原会话里是系统投递的消息，
+ * 计成"提问轮次"会让索引里出现一堆命令行，评审会以为学生拿命令当 prompt。
+ */
+function isJobReceipt(text) {
+  return /^background job \S+ \(pwsh:/.test(text.trim());
+}
+
+/** 把一条记录渲染成 {who, body, time}；返回 null 表示这条不导出 */
 function renderRecord(r, opts) {
   const d = r.data || {};
+  const time = fmtTime(r.time);
   switch (r.type) {
     case 'user/message': {
       const body = blocksToText(d.content, ['text']);
       if (!body.trim()) return null;
       if (isInjectedContext(body)) return null;
-      return { who: '用户', body: body.trim() };
+      if (isJobReceipt(body)) return null;
+      return { who: '用户', body: body.trim(), time };
     }
     case 'assistant/message': {
       const content = d.message?.content;
@@ -174,7 +206,7 @@ function renderRecord(r, opts) {
         }
       }
       if (!parts.length) return null;
-      return { who: 'AI', body: parts.join('\n\n') };
+      return { who: 'AI', body: parts.join('\n\n'), time };
     }
     case 'tool/call': {
       let a = d.arguments || '';
@@ -183,7 +215,7 @@ function renderRecord(r, opts) {
       } catch {
         /* 保持原样 */
       }
-      return { who: '工具调用', body: `\`${d.name}\` ${truncate(a, opts.toolArgs)}` };
+      return { who: '工具调用', body: `\`${d.name}\` ${truncate(a, opts.toolArgs)}`, time };
     }
     case 'tool/result': {
       const content = d.message?.content;
@@ -195,7 +227,7 @@ function renderRecord(r, opts) {
       }
       text = text.trim();
       if (!text) return null;
-      return { who: '工具结果', body: '```\n' + truncate(text, opts.toolResult) + '\n```' };
+      return { who: '工具结果', body: '```\n' + truncate(text, opts.toolResult) + '\n```', time };
     }
     default:
       return null;
@@ -270,6 +302,7 @@ for (const s of sessions) {
   }
 
   const lines = [];
+  const rounds = []; // 每轮提问：{n, time, head}
   let userCount = 0;
   let aiCount = 0;
   let toolCount = 0;
@@ -277,11 +310,19 @@ for (const s of sessions) {
   for (const r of records) {
     const rendered = renderRecord(r, opts);
     if (!rendered) continue;
-    if (rendered.who === '用户') userCount++;
-    else if (rendered.who === 'AI') aiCount++;
-    else toolCount++;
-
-    lines.push(`### ${rendered.who}`);
+    const stamp = rendered.time ? ` · ${rendered.time}` : '';
+    if (rendered.who === '用户') {
+      userCount++;
+      const head = rendered.body.replace(/\s+/g, ' ').slice(0, 60);
+      rounds.push({ n: userCount, time: rendered.time, head });
+      lines.push(`<a id="r${String(userCount).padStart(2, '0')}"></a>`);
+      lines.push('');
+      lines.push(`### 用户 · 第 ${userCount} 轮${stamp}`);
+    } else {
+      if (rendered.who === 'AI') aiCount++;
+      else toolCount++;
+      lines.push(`### ${rendered.who}${stamp}`);
+    }
     lines.push('');
     lines.push(rendered.body);
     lines.push('');
@@ -296,26 +337,45 @@ for (const s of sessions) {
   // 只用时间戳取名会撞车：同秒结束的会话会互相覆盖，所以补上会话 ID 前缀
   const shortId = sessionId.replace(/^session-/, '').slice(0, 8);
   const stamp = s.mtime.toISOString().replace(/[:.]/g, '-').slice(0, 19);
+  const timed = rounds.filter((x) => x.time);
+  const firstTime = timed.length ? timed[0].time : '';
+  const lastTime = timed.length ? timed[timed.length - 1].time : '';
+  const esc = (s) => String(s).replace(/\|/g, '\\|');
+  const indexRows = rounds.map(
+    (x) =>
+      `| ${x.n} | ${x.time || '—'} | ${esc(x.head)} | [跳转](#r${String(x.n).padStart(2, '0')}) |`
+  );
   const header = [
     `# AI 协同对话记录（Prompt 快照）`,
     '',
     `- 会话 ID：\`${sessionId}\``,
     `- 记录时间：${s.mtime.toISOString().replace('T', ' ').slice(0, 19)}`,
     `- 工作目录：\`D:\\code\``,
+    `- 提问轮次：${userCount} 轮${firstTime ? `（第 1 轮 ${firstTime} → 第 ${userCount} 轮 ${lastTime}）` : ''}`,
     `- 内容统计：用户提问 ${userCount} 条，AI 回答 ${aiCount} 条，工具调用与结果 ${toolCount} 条`,
     `- 导出方式：\`node tools/export-ai-log.mjs${opts.full ? ' --full' : ''}\``,
     '',
-    '> 本文件由脚本自动导出，内容未经人工删改。',
+    '> 本文件由脚本自动导出，内容未经人工删改；每条记录都带本地时间（UTC+8）。',
+    '> 已剔除非用户输入的两类记录：客户端注入的运行时上下文、后台任务完成回执。',
     opts.full ? '' : '> AI 的思考过程（reasoning）默认不导出，加 `--full` 可保留。',
     '',
-    '---',
+    '## 提问轮次索引',
     '',
-  ];
+    '> 正文每轮提问前都有锚点，点「跳转」可直接定位到该轮原文与随后的产出。',
+    '',
+    '| 轮次 | 时间 | 提问（首 60 字） | 定位 |',
+    '|---|---|---|---|',
+  ]
+    .concat(indexRows)
+    .concat(['', '---', '']);
 
   const outPath = join(outDir, `prompt-snapshot-${stamp}-${shortId}.md`);
   writeFileSync(outPath, header.concat(lines).join('\n'), 'utf8');
   exported++;
-  console.log(`已导出 ${basename(outPath)}  （用户 ${userCount} / AI ${aiCount} / 工具 ${toolCount}）`);
+  console.log(
+    `已导出 ${basename(outPath)}  （${userCount} 轮 / AI ${aiCount} / 工具 ${toolCount}，` +
+      `${firstTime.slice(0, 10)}→${lastTime.slice(0, 10)}）`
+  );
 }
 
 console.log(`\n完成：导出 ${exported} 个，跳过 ${skipped} 个（正在写入、为空或无用户提问）`);

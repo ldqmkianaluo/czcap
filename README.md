@@ -44,7 +44,7 @@
 
 | 模块 | 状态 | 说明 |
 |---|---|---|
-| 三种黑盒测试的实现 | ✅ 已实现 | 逻辑经 53 项离线断言验证 |
+| 三种黑盒测试的实现 | ✅ 已实现 | 逻辑经 68 项离线断言验证 |
 | yes/no 强制格式与容错解析 | ✅ 已实现 | 问题中强制要求只答 Yes/No，解析器兜底 |
 | 级联调度与早期剪枝 | ✅ 已实现 | 阈值仍为占位值，待用真实数据标定 |
 | 结果缓存 / 重试 / 并发 / 成本统计 | ✅ 已实现 | 缓存命中时可复现历史结果且不产生费用 |
@@ -56,6 +56,20 @@
 | Web 交互界面 | ✅ 已实现 | 标准库 HTTP 服务 + 单页前端，异步 job + 轮询，含证据区域叠加显示 |
 | 净化模块（可插拔中间件） | ⏳ 未开始 | |
 | 在公开基准上的完整评测 | ⏳ 未开始 | 计划使用 MHaluBench、HallusionBench、MMHal-Bench 等 |
+
+---
+
+## 给评审：五分钟看懂这个项目
+
+| 想确认什么 | 看哪里 |
+|---|---|
+| 作品是干什么的、怎么一键跑起来、AI 协同过程怎么核验 | **[`docs/提交说明.md`](docs/提交说明.md)** —— 一页纸，含复现三步、快照说明、演进链路表 |
+| 代码是不是真的能跑（不联网、不花钱、约 10 秒） | 双击根目录 **`自检.bat`**，预期末行「结果：全部通过」（68 项离线断言） |
+| 网页演示长什么样 | 双击 **`启动演示.bat`** → http://127.0.0.1:8000 ；没有 API Key 可先看 `reports/` 里的历史归因报告图 |
+| 开发过程的提问记录 | **[`ai-logs/`](ai-logs/)** —— 48 轮提问，带时间戳、轮次索引与正文锚点，可直接跳转到任意一轮 |
+| 技术细节与实验设计 | [`docs/技术文档.md`](docs/技术文档.md) |
+
+提交要求逐条对照见 [`docs/提交说明.md`](docs/提交说明.md) 第五节。
 
 ---
 
@@ -99,6 +113,8 @@ VLM_BASE_URL=https://api.deepseek.com
 
 ### 0. 打开网页界面（最直观）
 
+**双击 `启动演示.bat`**（等价于下面这行命令），然后浏览器打开 **http://127.0.0.1:8000**。
+
 ```powershell
 python code\server.py
 ```
@@ -113,6 +129,8 @@ python code\server.py
 **只用 Python 标准库起服务，不需要装 Flask / Node 等任何额外依赖。** 长任务走异步 job + 轮询，所以页面不会卡在请求里。
 
 ### 1. 先跑离线自检（不联网、不花钱）
+
+**双击 `自检.bat`**（等价于下面这行命令），预期末行输出「结果：全部通过」。
 
 ```powershell
 python code\selftest.py
@@ -190,6 +208,8 @@ python code\showlog.py --only-null  # 只看解析失败的调用
 ```
 .
 ├── README.md
+├── 自检.bat                  一键离线自检（双击运行）
+├── 启动演示.bat              一键启动网页演示（双击运行）
 ├── requirements.txt          依赖声明
 ├── .env.example              环境变量模板（不含真实密钥）
 ├── .gitignore / .gitattributes
@@ -205,11 +225,18 @@ python code\showlog.py --only-null  # 只看解析失败的调用
 ├── web/
 │   └── index.html            单页前端（无框架，vanilla JS）
 │
+├── ai-logs/                  AI 对话 Prompt 快照（过程证据，未经人工删改）
+│   ├── README.md             快照索引与复现命令
+│   └── prompt-snapshot-*.md
+│
 ├── tools/
 │   ├── export-ai-log.mjs     导出 AI 对话记录为 Prompt 快照
+│   ├── index_ai_logs.py      从全量导出中筛出与本项目相关的会话
 │   └── md2docx.ps1           Markdown 转 Word
 │
 ├── docs/                     项目文档
+│   ├── 提交说明.md            ★ 给评审的一页纸：复现三步 + 快照说明 + 演进链路
+│   ├── 技术文档.md            技术细节与实验设计
 │   ├── 02-评测集设计与标注规范.md
 │   ├── 03-申报书_技术方案与创新点.md
 │   ├── 04-评测方案与实验设计.md
@@ -280,12 +307,19 @@ python code\showlog.py --only-null  # 只看解析失败的调用
 
 本项目在开发过程中使用 AI 编程助手协同完成，这符合赛事对 AI 应用创新的鼓励方向。所有 AI 对话记录均通过 `tools/export-ai-log.mjs` 导出留档，**未经人工删改**。
 
+当前留档：[`ai-logs/prompt-snapshot-2026-11-01T11-45-50-58ca1d41.md`](ai-logs/prompt-snapshot-2026-11-01T11-45-50-58ca1d41.md) —— **48 轮提问**，覆盖 2026-10-07 11:14 至 2026-11-01 19:45，每条记录带**本地时间（UTC+8）**，文件开头有「提问轮次索引」表，可用锚点跳转到任意一轮。提问轮次、产出文件与 git 提交的对应关系见 [`docs/提交说明.md`](docs/提交说明.md) 第四节。
+
 ```powershell
 node tools\export-ai-log.mjs --list      # 列出全部会话
 node tools\export-ai-log.mjs --inspect   # 查看会话记录结构
 node tools\export-ai-log.mjs             # 导出为 Markdown（默认不含 AI 思考过程）
 node tools\export-ai-log.mjs --full      # 额外保留 AI 的思考过程
+python tools\index_ai_logs.py                     # 打印全部会话与项目的相关度统计
+python tools\index_ai_logs.py --write             # 重新生成 ai-logs/README.md 索引表
+python tools\index_ai_logs.py --copy-to ai-logs   # 只把相关的复制进 ai-logs/
 ```
+
+> 导出时会自动剔除两类非用户输入的内容：客户端注入的运行时上下文、后台任务的完成回执，以免轮次索引里混入命令行噪声。
 
 > 实现说明：DSH 的会话文件是**多帧 zstd 流**（每次写入追加一帧）。Node 的 `zstdDecompressSync` 和 `createZstdDecompress` **都只解第一帧就停止**——实测一个 2 MB 的文件含 4400 帧，直接用现成 API 只能拿到开头 171 个字符。因此本工具自行按帧魔数切帧、逐段解压。
 

@@ -12,6 +12,8 @@
 *.yaml  text eol=lf
 *.ps1   text eol=lf
 *.sh    text eol=lf
+# .bat 必须保持 CRLF：cmd 对 LF 换行的批处理会解析错乱（goto 标签、括号块都会失效）
+*.bat   text eol=crlf
 
 # 二进制文件不做换行符转换
 *.jpg   binary

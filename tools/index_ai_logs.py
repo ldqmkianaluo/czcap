@@ -61,8 +61,14 @@ def parse_session(path: Path) -> dict:
     session_id = grab(r"会话 ID：`([^`]+)`")
     created = grab(r"记录时间：(.+)")
     stats = grab(r"内容统计：(.+)")
+    rounds = grab(r"提问轮次：(\d+) 轮")
+    span = grab(r"提问轮次：.*?（(第 1 轮 .+?)）")
+    tools = grab(r"工具调用与结果 (\d+) 条")
 
-    raw_prompts = re.findall(r"### 用户\n\n(.*?)(?=\n### |\n---|\Z)", text, re.S)
+    # 正文里每轮提问的标题形如：### 用户 · 第 12 轮 · 2026-10-25 12:08
+    raw_prompts = re.findall(
+        r"^### 用户[^\n]*\n\n(.*?)(?=\n### |\n---|\Z)", text, re.S | re.M
+    )
     prompts = [re.sub(r"\s+", " ", p).strip()[:70] for p in raw_prompts[:3]]
 
     # 只在**用户提问**里找关键词，不在全文里找。实测教训：有的会话只是列了一下
@@ -78,12 +84,41 @@ def parse_session(path: Path) -> dict:
         "session_id": session_id,
         "created": created,
         "stats": stats,
+        "rounds": int(rounds) if rounds else len(raw_prompts),
+        "span": span,
         "prompts": prompts,
         "strong": strong_hits,
         "weak": weak_hits,
         "related": related,
         "size_kb": round(path.stat().st_size / 1024, 1),
+        # 内容完整度：轮次是主干，工具调用与结果决定「过程证据」是否完整。
+        # 只比轮次会选错——有的导出轮次多但工具结果全被截断成空，过程反而核验不了。
+        "richness": (int(rounds) if rounds else len(raw_prompts)) * 10
+        + (int(tools) if tools else 0),
     }
+
+
+def dedupe_sessions(sessions: list[dict]) -> tuple[list[dict], list[str]]:
+    """同一场对话可能被导出成多份快照。
+
+    会话文件会在续写、格式升级时产生新的文件名（mtime 变了），同一个会话 ID
+    于是出现好几个 md。原样收进 ai-logs/ 会让评审看到同一场对话的多个副本，
+    像是凑数。这里按会话 ID 去重，只留内容最全的一份。
+    """
+    best: dict[str, dict] = {}
+    dropped: list[str] = []
+    for s in sessions:
+        key = s["session_id"] or s["file"]
+        cur = best.get(key)
+        if cur is None:
+            best[key] = s
+        elif s["richness"] > cur["richness"]:
+            dropped.append(cur["file"])
+            best[key] = s
+        else:
+            dropped.append(s["file"])
+    kept = sorted(best.values(), key=lambda s: s["created"])
+    return kept, dropped
 
 
 def main() -> None:
@@ -102,6 +137,12 @@ def main() -> None:
 
     sessions = [parse_session(f) for f in files]
     sessions.sort(key=lambda s: s["created"])
+    sessions, dropped = dedupe_sessions(sessions)
+    if dropped:
+        print(f"同一会话有多份导出，只保留内容最全的一份，跳过 {len(dropped)} 份：")
+        for name in dropped:
+            print(f"  - {name}")
+        print()
 
     related = [s for s in sessions if s["related"]]
     others = [s for s in sessions if not s["related"]]
@@ -151,30 +192,40 @@ def main() -> None:
             "",
             "## 收录的会话",
             "",
-            "| 记录时间 | 大小 | 内容统计 | 首条提问 | 文件 |",
-            "|---|---|---|---|---|",
+            "| 记录时间 | 轮次 | 覆盖时间 | 大小 | 首条提问 | 文件 |",
+            "|---|---|---|---|---|---|",
         ]
         for s in related:
             p = (s["prompts"][0] if s["prompts"] else "（无）").replace("|", "\\|")
-            stats = s["stats"].replace("|", "\\|") or "—"
+            span = (s["span"] or "—").replace("|", "\\|")
             lines.append(
-                f"| {s['created'][:19]} | {s['size_kb']} KB | {stats} | {p} | "
+                f"| {s['created'][:19]} | {s['rounds']} | {span} | {s['size_kb']} KB | {p} | "
                 f"[{s['file']}](./{s['file']}) |"
             )
         lines += [
             "",
+            "## 怎么看这份快照",
+            "",
+            "每个快照文件开头都有一张「提问轮次索引」表：轮次 / 时间 / 提问首行 / 定位。",
+            "正文里每轮提问前都有锚点（`#r01`…），点索引里的「跳转」直接落到该轮原文和它带来的产出。",
+            "",
+            "要核验「哪一轮提问催生了哪个功能」，看 [`docs/提交说明.md`](../docs/提交说明.md)",
+            "里的「演进链路」表——它把每一轮的提问、当时产出的功能、以及对应的 git 提交对在了一起。",
+            "",
             "## 复现方式",
             "",
             "```bash",
-            "node tools/export-ai-log.mjs            # 导出全部会话到 .ai-logs-raw/",
-            "python tools/index_ai_logs.py --copy-to ai-logs   # 筛出相关会话到 ai-logs/",
+            "node tools/export-ai-log.mjs                       # 导出全部会话到 .ai-logs-raw/",
+            "python tools/index_ai_logs.py --copy-to ai-logs    # 筛出相关会话到 ai-logs/",
             "```",
             "",
             "## 说明",
             "",
             "- 内容由脚本从 DSH 会话记录直接导出，未经人工删改；",
+            "- 每条记录都带本地时间（UTC+8），可以直接和 git 提交时间对照；",
             "- AI 的思考过程（reasoning）默认不导出，可加 `--full` 保留；",
-            "- 已剔除客户端自动注入的运行时上下文（文件策略、审批策略等），避免与项目无关的噪音；",
+            "- 已剔除非用户输入的记录：客户端自动注入的运行时上下文、后台任务完成回执；",
+            "- 同一会话的多份导出只保留内容最全的一份；",
             "- 会话按时间累积，提交前应重新导出以覆盖最新进展。",
         ]
         out.write_text("\n".join(lines) + "\n", encoding="utf-8")
