@@ -157,18 +157,27 @@ function fmtTime(t) {
 /**
  * 客户端自动注入的上下文片段。
  *
- * DSH 会在每轮对话前注入一段运行时上下文（文件策略、审批策略等），它们在
- * 会话记录里同样是 user/message，但并不是用户真正输入的内容。不滤掉的话，
- * 快照里会夹进大量与项目无关的噪音，评审读起来会以为是学生写的。
+ * DSH 会在每轮对话前注入一段运行时上下文（文件策略、审批策略等）以及若干系统
+ * 提示块，它们在会话记录里同样是 user/message，但并不是用户真正输入的内容。
+ * 不滤掉的话，快照里会夹进大量与项目无关的噪音，评审读起来会以为是学生写的，
+ * 而且"提问轮次"会被这些自动消息撑大。
  */
 const INJECTED_MARKERS = [
   'Current runtime context.',
   'This snapshot supersedes earlier runtime-context snapshots.',
+  '<system-reminder>',
+  'Time sampled while preparing turn',
+  'Elapsed since the preceding',
+  // 上下文压缩器自动插入的历史摘要段，不是用户输入
+  '[Compressed conversation section]',
 ];
 
 function isInjectedContext(text) {
   const t = text.trim();
-  return INJECTED_MARKERS.some((m) => t.startsWith(m) || t.includes(m));
+  if (INJECTED_MARKERS.some((m) => t.includes(m))) return true;
+  // 以 XML 风格系统标签开头的整段（<system-reminder>… / <acp …>…）
+  if (/^<[a-z-]+[ >]/.test(t) && t.indexOf('>') < 60) return true;
+  return false;
 }
 
 /**
@@ -356,7 +365,7 @@ for (const s of sessions) {
     `- 导出方式：\`node tools/export-ai-log.mjs${opts.full ? ' --full' : ''}\``,
     '',
     '> 本文件由脚本自动导出，内容未经人工删改；每条记录都带本地时间（UTC+8）。',
-    '> 已剔除非用户输入的两类记录：客户端注入的运行时上下文、后台任务完成回执。',
+    '> 已剔除非用户输入的记录：客户端注入的运行时上下文与系统提示块、上下文压缩器插入的历史摘要、后台任务完成回执。',
     opts.full ? '' : '> AI 的思考过程（reasoning）默认不导出，加 `--full` 可保留。',
     '',
     '## 提问轮次索引',

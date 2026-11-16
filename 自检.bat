@@ -14,10 +14,14 @@ where python >nul 2>nul
 if errorlevel 1 goto NOPYTHON
 
 python --version
-if not exist "code\selftest.py" goto NOFILE
+
+rem 仓库里路径是 code\selftest.py；交付包里源码在 源码\code\ 下，两种都认
+set SELFTEST=code\selftest.py
+if not exist "%SELFTEST%" set SELFTEST=源码\code\selftest.py
+if not exist "%SELFTEST%" goto NOFILE
 
 echo.
-python code\selftest.py
+python "%SELFTEST%"
 set RC=%ERRORLEVEL%
 
 echo.
@@ -35,7 +39,8 @@ pause
 exit /b 1
 
 :NOFILE
-echo [错误] 找不到 code\selftest.py，请确认在项目根目录运行本脚本。
+echo [错误] 找不到 selftest.py，请在项目根目录运行本脚本。
+echo        仓库根目录应有 code\selftest.py，交付包根目录应有 源码\code\selftest.py
 echo.
 pause
 exit /b 1

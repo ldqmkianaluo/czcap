@@ -16,7 +16,17 @@ from __future__ import annotations
 
 import argparse
 import re
+import sys
 from pathlib import Path
+
+# Windows 控制台默认 GBK，遇到 emoji 或生僻字会直接抛 UnicodeEncodeError，
+# 让整个脚本在打印表格时崩掉（而复制文件的那一步还没执行）。这里兜底成
+# UTF-8 + 替换不可编码字符，保证无论控制台是什么代码页都能跑完。
+try:
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+except Exception:  # pragma: no cover - 老版本 Python 或已被重定向时忽略
+    pass
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 # 原始导出目录：包含全部会话（含与项目无关的私人内容），已加入 .gitignore，绝不提交
