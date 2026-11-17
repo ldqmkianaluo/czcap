@@ -327,6 +327,64 @@ python code\showlog.py --only-null  # 只看解析失败的调用</code></pre>
 <p>按优先级排列：</p>
 <ol><li><b>在公开基准上完成评测。</b> 计划使用 MHaluBench（评测检测器本身）、HallusionBench（二分判定）、MMHal-Bench 与 Object HalBench（净化效果）。</li><li><b>用真实数据完成阈值标定。</b> 合成数据错误率过低，需真实照片或 POPE 的 adversarial split。</li><li><b>目标尺寸上限的缓解。</b> 可考虑引入候选区域提议（而非均匀网格），把遮挡窗口集中在可能的目标上，从而在同等预算下支持更大的目标。</li><li><b>批量归因的并发优化。</b> 边缘收缩目前顺序执行，是延迟瓶颈。</li><li><b>开放式长文本的逐句拆解。</b> 扩展适用范围。</li><li><b>接入第二个模型做交叉验证。</b> 降低对单一实验性模型的依赖。</li></ol>
 <hr/>
+<h2>8. AI 协同开发方法</h2>
+<blockquote>本章回答评审要求重点阐述的三件事：<b>意图控制策略</b>（如何设计上下文与 Prompt）、<b>架构设计</b>（AI 生成的代码采用什么架构、如何约束）、<b>可复现性论证</b>。<br/>写作原则：只描述本项目实际执行过的做法，并给出可在仓库中核验的位置（快照轮次 / 提交号 / 文件）。</blockquote>
+<h3>8.1 意图控制策略：把需求写成「可判定的现象」，而不是「实现方案」</h3>
+<p>AI 协同开发里最容易失控的一步是：需求描述得太像方案，AI 就会照着我的错误理解去写代码。本项目采用四条规则。</p>
+<p><b>规则一：需求以可观测的现象提出，方案由 AI 给出。</b></p>
+<p>最典型的是大目标误判的修复（快照第 30–32 轮 → 提交 <code>6b40e8e</code>）。我当时给出的不是「请加一个全图遮蔽对照」，而是把现象摆清楚：</p>
+<ul><li>同一张图、同一个问题，快速模式测了 6 个窗口，<b>没有任何窗口能让答案翻转</b>，于是判成「无视觉依据型幻觉」；</li><li>但把<b>整张图</b>遮住再问，答案会变——说明模型确实在看图；</li><li>这两个结果互相矛盾，必须解释清楚，否则这个判定是错的。</li></ul>
+<p>AI 随后给出解释（目标尺寸超过滑动窗口的覆盖上限）和方案（补一次全图遮蔽调用），并被我要求先写进文档、再改代码。<b>现象驱动的好处是：我对方案的想象往往是错的，而现象是客观的。</b></p>
+<p><b>规则二：每轮只推进一个「可离线验证的模块」。</b></p>
+<p>一个模块的完成定义是三件事同时成立：<b>有断言、能跑通、有一次独立提交</b>——不是「看起来写完了」。这条规则把 AI 的产出切成可回退的小块（37 个提交，截至 2026-11-17，按 <code>feat:</code> / <code>fix:</code> / <code>docs:</code> / <code>chore:</code> 前缀分类），也让每次推进都有客观验收点。</p>
+<p><b>规则三：先定接口与数据结构，再让 AI 填实现。</b></p>
+<p>外部契约先落成文字，AI 的实现必须满足它：</p>
+<table>
+<tr><th>契约</th><th>写在哪</th></tr>
+<tr><td>任务名（<code>probe_demo</code> / <code>attribution</code> / <code>pope_b0</code>）与参数</td><td><code>README.md</code> 快速开始、<code>halulens.py</code> 的 argparse</td></tr>
+<tr><td>评测数据字段语义（<code>label: 1 = 对象存在</code>）</td><td><code>README.md</code> 第 3 步、<code>load_pope</code> 文档字符串</td></tr>
+<tr><td>返回值键名（<code>baseline</code> / <code>influential_cells</code> / <code>has_visual_grounding</code>）</td><td><code>README.md</code> 预期输出、技术文档 2.7 决策表</td></tr>
+<tr><td>判定文案（几种结论的固定说法）</td><td>技术文档 2.7、<code>server.py</code> 判定分支</td></tr>
+</table>
+<p>契约固定之后，AI 改实现不会改坏调用方——这也是为什么 <code>README.md</code> 里的示例输出能被当作验收标准。</p>
+<p><b>规则四：上下文不靠对话记忆，靠仓库里的文档。</b></p>
+<p>长会话一定会被压缩，压缩之后我对前文的记忆不可靠，AI 也一样。因此本项目的做法是：<b>把关键约束写成文件，每轮开工先读文件</b>——</p>
+<ul><li>已披露的限制写在 <code>README.md</code>「已知限制」10 条，不靠口头提醒；</li><li>方法与判定写在技术文档（本文件）与 2.7 决策表；</li><li>提交要求与演进链路写在 <code>docs/提交说明.md</code>。</li></ul>
+<p>这样即使换一场新会话、换一个 AI 工具，约束仍然在。</p>
+<h3>8.2 架构设计：AI 生成的代码遵守什么结构，我用什么约束它</h3>
+<p><b>结构：四层，职责单向依赖。</b></p>
+<table>
+<tr><th>层</th><th>位置</th><th>职责</th><th>约束</th></tr>
+<tr><td>度量 / 判定（纯函数）</td><td><code>halulens.py</code> 中的度量函数</td><td>一致性度量、遮蔽、覆盖保证、收缩、判定</td><td>不发起网络请求、不依赖全局状态，因此可离线断言</td></tr>
+<tr><td>模型调用</td><td><code>halulens.VLMClient</code></td><td>唯一出口：重试、截断扩容、yes/no 解析、调用记录</td><td>API 访问集中于此，其它层不直接请求</td></tr>
+<tr><td>编排</td><td><code>halulens.main</code>、<code>server._run_job</code></td><td>任务分派、参数装配、结果落盘</td><td>调用上面两层，度量与判定复用其实现</td></tr>
+<tr><td>呈现</td><td><code>viz.py</code>、<code>web/index.html</code></td><td>四联报告图、页面渲染与轮询</td><td>只渲染，不做判定</td></tr>
+</table>
+<p><b>四条硬约束（用来自动否掉 AI 跑偏的实现）：</b></p>
+<ol><li><b>不做训练、不碰模型内部。</b> 全部黑盒——防止 AI 顺手引入需要权重或注意力图的方法，那会让整个作品的前提失效。</li><li><b>新增第三方依赖必须为零或仅限 <code>openai</code> / <code>Pillow</code>，Web 服务只用标准库。</b> 目的是让评审的机器上一定能跑起来：不需要额外装框架，也不需要 Node。</li><li><b>新逻辑必须能离线断言。</b> 不能写成可离线验证的函数、没法在 <code>selftest.py</code> 里加断言的逻辑，不给合并。68 项断言就是这条约束的产物。</li><li><b>一次提交一个模块，可单点回退。</b> 出问题能 <code>git revert</code> 单个提交，不必整体回滚。</li></ol>
+<p><b>被否掉的方案同样写进文档。</b> 技术文档 3.2 节记录了两个「纸面上很自然、实现后被证伪」的设计——固定网格（无法覆盖跨界目标）与细分精化（<b>精化方向与「需要完整遮挡」这一约束恰好相反</b>）。把否掉的原因写清楚，比只留下最终代码更有价值：它解释了架构为什么长成这样。</p>
+<h3>8.3 可复现性论证</h3>
+<p><b>论点</b>：在锁定五个变量之后，任何人在任何机器上都能复算出同样的判定，而不是「我说我跑过」。</p>
+<p><b>五个锁定层：</b></p>
+<table>
+<tr><th>层</th><th>锁住什么</th><th>本项目的实现</th></tr>
+<tr><td>① 环境</td><td>解释器与依赖版本</td><td>Python 3.13.9 / openai 3.26.0 / pillow 12.3.0，写入 <code>requirements.txt</code> 与本文档 6.1</td></tr>
+<tr><td>② 输入</td><td>图像内容、问题文本、prompt 版本</td><td>缓存键 = 模型名 + prompt 版本 + <b>图像内容哈希</b> + 问题文本 + 采样参数</td></tr>
+<tr><td>③ 调用</td><td>模型身份与采样参数</td><td><code>runs/*.jsonl</code> 记录请求模型名与<b>服务端返回的实际版本</b>；对比实验固定 <code>temperature=0</code></td></tr>
+<tr><td>④ 输出</td><td>每次调用的原始输出与解析结果</td><td><code>runs/*.jsonl</code> 逐次落盘；解析异常用 <code>showlog.py</code> 回看原话</td></tr>
+<tr><td>⑤ 过程</td><td>需求如何演进来的</td><td><code>ai-logs/</code> 48 轮快照（带时间戳与轮次索引）与 37 个提交对应（<code>docs/提交说明.md</code> 第四节）</td></tr>
+</table>
+<p><b>不同条件下能复现到什么程度（评审最需要的一张表）：</b></p>
+<table>
+<tr><th>条件</th><th>能验证什么</th><th>用时</th></tr>
+<tr><td>无网络、无 API Key</td><td>68 项离线断言全部通过；16 张历史报告图的判定与证据区域可逐张核对</td><td>约 5 分钟</td></tr>
+<tr><td>有 API Key</td><td>端到端跑一次快速归因（5–10 次调用），与 <code>runs/</code> 中历史记录对照</td><td>再加 2–5 分钟</td></tr>
+<tr><td>有网络、无 Key</td><td>读 <code>runs/*.jsonl</code> 的逐次原始输出，与快照轮次、提交时间三向对照</td><td>约 10 分钟</td></tr>
+</table>
+<p><b>失败时的排查路径（不是「再跑一次看看」）：</b></p>
+<ol><li>判定反常 → <code>python code\showlog.py</code> 看模型原话，先排除解析问题；</li><li>数字对不上 → 对比 <code>runs/*.jsonl</code> 里的模型版本与 prompt 版本，版本不同则结果不可比；</li><li>证据区域异常大 → 先查覆盖保证 <code>(window − stride) × 短边 ≥ 目标尺寸</code> 是否被违反（<code>selftest.py</code> 有对应断言）。</li></ol>
+<p><b>结论</b>：可复现性在本项目中不是一句承诺，而是五层锁定 + 一张「谁能验证什么」的表 + 一条排查路径。凡是不满足的部分，本文档第 5 节已作为限制如实列出（阈值未标定、合成数据不构成能力结论等）。</p>
+<hr/>
 <h2>附录 A：关键实现位置</h2>
 <table>
 <tr><th>功能</th><th>位置</th></tr>
